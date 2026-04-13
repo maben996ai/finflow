@@ -1,7 +1,7 @@
 FROM node:20-alpine AS base
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY package.json ./
+RUN npm install
 
 # ---- 开发阶段（docker-compose.yml 使用）----
 FROM base AS dev
