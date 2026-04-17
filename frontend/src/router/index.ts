@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 
 import AppShell from "../components/layout/AppShell.vue";
+import { useAuthStore } from "../stores/auth";
 import CrawlLogsView from "../views/CrawlLogsView.vue";
 import CreatorsView from "../views/CreatorsView.vue";
 import FeedView from "../views/FeedView.vue";
@@ -11,8 +12,8 @@ import SettingsView from "../views/SettingsView.vue";
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/login", name: "login", component: LoginView },
-    { path: "/register", name: "register", component: RegisterView },
+    { path: "/login", name: "login", component: LoginView, meta: { public: true } },
+    { path: "/register", name: "register", component: RegisterView, meta: { public: true } },
     {
       path: "/",
       component: AppShell,
@@ -24,4 +25,20 @@ export const router = createRouter({
       ],
     },
   ],
+});
+
+router.beforeEach(async (to) => {
+  const authStore = useAuthStore();
+
+  if (authStore.isAuthenticated && !authStore.user) {
+    await authStore.fetchUser();
+  }
+
+  if (!to.meta.public && !authStore.isAuthenticated) {
+    return { name: "login" };
+  }
+
+  if (to.meta.public && authStore.isAuthenticated) {
+    return { name: "feed" };
+  }
 });

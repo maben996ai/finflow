@@ -1,13 +1,3 @@
-# =============================================
-# 开发环境配置（Mac 直接使用，Windows 需叠加覆盖层）
-#
-# Mac:     docker compose up
-#          make dev-mac
-#
-# Windows: docker compose -f docker-compose.yml -f docker-compose.win.yml up
-#          make dev-win
-# =============================================
-
 services:
   postgres:
     image: postgres:16-alpine
