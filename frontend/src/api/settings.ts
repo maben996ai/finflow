@@ -7,5 +7,7 @@ export const settingsApi = {
   updateFeishu(payload: { feishu_webhook_url?: string | null }) {
     return apiClient.put("/settings/feishu", payload);
   },
+  testFeishu() {
+    return apiClient.post("/settings/feishu/test");
+  },
 };
-
