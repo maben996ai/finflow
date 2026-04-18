@@ -44,7 +44,7 @@
 
     <div v-else class="creator-list">
       <div v-for="c in creators" :key="c.id" class="creator-row panel">
-        <img v-if="c.avatar_url" :src="c.avatar_url" class="creator-row-avatar" :alt="c.name" />
+        <img v-if="c.avatar_url" :src="c.avatar_url" class="creator-row-avatar" :alt="c.name" referrerpolicy="no-referrer" />
         <div v-else class="creator-row-avatar creator-row-avatar-placeholder" />
 
         <div class="creator-row-info">

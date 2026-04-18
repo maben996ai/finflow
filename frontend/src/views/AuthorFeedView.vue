@@ -4,7 +4,7 @@
       <div class="author-hero-info">
         <RouterLink to="/" class="back-link">{{ t("feed.backToFeed") }}</RouterLink>
         <div class="author-hero-identity">
-          <img v-if="authorAvatar" :src="authorAvatar" class="creator-avatar-lg" :alt="authorName" />
+          <img v-if="authorAvatar" :src="authorAvatar" class="creator-avatar-lg" :alt="authorName" referrerpolicy="no-referrer" />
           <div v-else class="creator-avatar-lg creator-avatar-placeholder" />
           <div>
             <p class="eyebrow">{{ authorPlatform }}</p>
@@ -28,7 +28,7 @@
           class="video-card-sm"
         >
           <div class="video-thumb-sm">
-            <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" />
+            <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
             <div v-else class="video-thumb-placeholder" />
             <span class="platform-badge" :class="video.platform">{{ video.platform }}</span>
           </div>
