@@ -1,0 +1,385 @@
+"""
+Tests for:
+  - /api/webhooks/feishu  (multi-webhook CRUD)
+  - /api/creators  content_type filter & default
+  - FeishuNotifier.send_card
+"""
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+import httpx
+
+from app.models.models import ContentType, Platform
+from app.services.crawlers.base import CreatorInfo
+from app.services.notifiers.feishu import FeishuNotifier
+
+REGISTER_PAYLOAD = {
+    "email": "alice@example.com",
+    "password": "password123",
+    "display_name": "Alice",
+}
+
+MOCK_CREATOR_INFO = CreatorInfo(
+    platform_id="123456",
+    name="测试UP主",
+    profile_url="https://space.bilibili.com/123456",
+    avatar_url=None,
+)
+
+WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/test-xxx"
+
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+async def _make_creator(client, auth_headers, content_type: str = "video"):
+    with patch(
+        "app.api.creators.resolve_creator",
+        new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+    ):
+        resp = await client.post(
+            "/api/creators",
+            json={"url": "https://space.bilibili.com/123456", "content_type": content_type},
+            headers=auth_headers,
+        )
+    return resp
+
+
+# ── FeishuWebhooks API ────────────────────────────────────────────────────────
+
+class TestFeishuWebhooksAPI:
+    async def test_list_returns_empty_for_new_user(self, client, auth_headers):
+        resp = await client.get("/api/webhooks/feishu", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    async def test_create_webhook_returns_201(self, client, auth_headers):
+        resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "港股研究群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["name"] == "港股研究群"
+        assert body["webhook_url"] == WEBHOOK_URL
+        assert body["enabled"] is True
+
+    async def test_create_webhook_appears_in_list(self, client, auth_headers):
+        await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群A", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群B", "webhook_url": WEBHOOK_URL + "2"},
+            headers=auth_headers,
+        )
+        resp = await client.get("/api/webhooks/feishu", headers=auth_headers)
+        assert resp.status_code == 200
+        names = [w["name"] for w in resp.json()]
+        assert "群A" in names
+        assert "群B" in names
+
+    async def test_update_webhook_name(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "旧名字", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        webhook_id = create_resp.json()["id"]
+        resp = await client.put(
+            f"/api/webhooks/feishu/{webhook_id}",
+            json={"name": "新名字"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "新名字"
+
+    async def test_update_webhook_enabled_false(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        webhook_id = create_resp.json()["id"]
+        resp = await client.put(
+            f"/api/webhooks/feishu/{webhook_id}",
+            json={"enabled": False},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["enabled"] is False
+
+    async def test_delete_webhook_returns_204(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        webhook_id = create_resp.json()["id"]
+        resp = await client.delete(f"/api/webhooks/feishu/{webhook_id}", headers=auth_headers)
+        assert resp.status_code == 204
+
+    async def test_delete_webhook_removes_from_list(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        webhook_id = create_resp.json()["id"]
+        await client.delete(f"/api/webhooks/feishu/{webhook_id}", headers=auth_headers)
+        list_resp = await client.get("/api/webhooks/feishu", headers=auth_headers)
+        assert all(w["id"] != webhook_id for w in list_resp.json())
+
+    async def test_delete_nonexistent_returns_404(self, client, auth_headers):
+        resp = await client.delete("/api/webhooks/feishu/no-such-id", headers=auth_headers)
+        assert resp.status_code == 404
+
+    async def test_update_nonexistent_returns_404(self, client, auth_headers):
+        resp = await client.put(
+            "/api/webhooks/feishu/no-such-id",
+            json={"name": "x"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+
+    async def test_test_endpoint_calls_notifier(self, client, auth_headers):
+        create_resp = await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        webhook_id = create_resp.json()["id"]
+
+        with patch(
+            "app.api.webhooks._notifier.send_card",
+            new=AsyncMock(),
+        ) as mock_send:
+            resp = await client.post(
+                f"/api/webhooks/feishu/{webhook_id}/test",
+                headers=auth_headers,
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+        mock_send.assert_awaited_once()
+
+    async def test_test_endpoint_nonexistent_returns_404(self, client, auth_headers):
+        resp = await client.post("/api/webhooks/feishu/no-such-id/test", headers=auth_headers)
+        assert resp.status_code == 404
+
+    async def test_webhooks_isolated_between_users(self, client, auth_headers):
+        """User A's webhooks are not visible to User B."""
+        await client.post(
+            "/api/webhooks/feishu",
+            json={"name": "A的群", "webhook_url": WEBHOOK_URL},
+            headers=auth_headers,
+        )
+        # register & login as user B
+        await client.post(
+            "/api/auth/register",
+            json={"email": "bob@example.com", "password": "password123", "display_name": "Bob"},
+        )
+        login_resp = await client.post(
+            "/api/auth/login",
+            json={"email": "bob@example.com", "password": "password123"},
+        )
+        bob_headers = {"Authorization": f"Bearer {login_resp.json()['access_token']}"}
+
+        resp = await client.get("/api/webhooks/feishu", headers=bob_headers)
+        assert resp.json() == []
+
+
+# ── Creators content_type ─────────────────────────────────────────────────────
+
+class TestCreatorsContentType:
+    async def test_create_defaults_to_video(self, client, auth_headers):
+        resp = await _make_creator(client, auth_headers)
+        assert resp.status_code == 201
+        assert resp.json()["content_type"] == "video"
+
+    async def test_create_with_explicit_content_type(self, client, auth_headers):
+        resp = await _make_creator(client, auth_headers, content_type="article")
+        assert resp.status_code == 201
+        assert resp.json()["content_type"] == "article"
+
+    async def test_list_filter_by_content_type_video(self, client, auth_headers):
+        await _make_creator(client, auth_headers, content_type="video")
+        resp = await client.get("/api/creators?content_type=video", headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["content_type"] == "video"
+
+    async def test_list_filter_excludes_other_types(self, client, auth_headers):
+        await _make_creator(client, auth_headers, content_type="video")
+        resp = await client.get("/api/creators?content_type=article", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    async def test_list_without_filter_returns_all(self, client, auth_headers):
+        with patch(
+            "app.api.creators.resolve_creator",
+            new=AsyncMock(side_effect=[
+                (Platform.BILIBILI, MOCK_CREATOR_INFO),
+                (Platform.BILIBILI, CreatorInfo(
+                    platform_id="999999",
+                    name="另一个UP主",
+                    profile_url="https://space.bilibili.com/999999",
+                    avatar_url=None,
+                )),
+            ]),
+        ):
+            await client.post(
+                "/api/creators",
+                json={"url": "https://space.bilibili.com/123456", "content_type": "video"},
+                headers=auth_headers,
+            )
+            await client.post(
+                "/api/creators",
+                json={"url": "https://space.bilibili.com/999999", "content_type": "article"},
+                headers=auth_headers,
+            )
+
+        resp = await client.get("/api/creators", headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+    async def test_patch_content_type(self, client, auth_headers):
+        create_resp = await _make_creator(client, auth_headers, content_type="video")
+        creator_id = create_resp.json()["id"]
+
+        resp = await client.patch(
+            f"/api/creators/{creator_id}",
+            json={"content_type": "article"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["content_type"] == "article"
+
+    async def test_patch_content_type_then_filtered_out(self, client, auth_headers):
+        """After changing type from video to article, video filter returns empty."""
+        create_resp = await _make_creator(client, auth_headers, content_type="video")
+        creator_id = create_resp.json()["id"]
+
+        await client.patch(
+            f"/api/creators/{creator_id}",
+            json={"content_type": "article"},
+            headers=auth_headers,
+        )
+
+        resp = await client.get("/api/creators?content_type=video", headers=auth_headers)
+        assert resp.json() == []
+
+
+# ── FeishuNotifier ────────────────────────────────────────────────────────────
+
+class TestFeishuNotifier:
+    async def test_send_card_posts_to_webhook(self):
+        notifier = FeishuNotifier()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="测试视频标题",
+                creator_name="测试创作者",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+            )
+
+        mock_client.post.assert_awaited_once()
+        call_args = mock_client.post.call_args
+        payload = call_args.kwargs["json"]
+        assert payload["msg_type"] == "interactive"
+        assert "card" in payload
+
+    async def test_send_card_skips_when_no_webhook_url(self):
+        notifier = FeishuNotifier()
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            await notifier.send_card(
+                webhook_url="",
+                title="title",
+                creator_name="creator",
+                platform="bilibili",
+                video_url="https://www.bilibili.com",
+            )
+            mock_client_cls.assert_not_called()
+
+    async def test_send_card_new_creator_uses_blue_header(self):
+        notifier = FeishuNotifier()
+        sent_payload = {}
+
+        async def fake_post(url, *, json):
+            sent_payload.update(json)
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="首条视频",
+                creator_name="新创作者",
+                platform="youtube",
+                video_url="https://youtube.com/watch?v=abc",
+                is_new_creator=True,
+            )
+
+        assert sent_payload.get("card", {}).get("header", {}).get("template") == "blue"
+
+    async def test_send_card_existing_creator_uses_green_header(self):
+        notifier = FeishuNotifier()
+        sent_payload = {}
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="新视频",
+                creator_name="老创作者",
+                platform="bilibili",
+                video_url="https://www.bilibili.com/video/BV1",
+                is_new_creator=False,
+            )
+
+        assert sent_payload.get("card", {}).get("header", {}).get("template") == "green"
+
+    async def test_send_card_title_contains_video_link(self):
+        notifier = FeishuNotifier()
+        sent_payload = {}
+
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client_cls.return_value = mock_client
+
+            video_url = "https://www.bilibili.com/video/BV123"
+            await notifier.send_card(
+                webhook_url=WEBHOOK_URL,
+                title="港股分析",
+                creator_name="财经UP",
+                platform="bilibili",
+                video_url=video_url,
+            )
+
+        elements = sent_payload.get("card", {}).get("elements", [])
+        title_element = next((e for e in elements if e.get("tag") == "div" and "text" in e), None)
+        assert title_element is not None
+        assert video_url in title_element["text"]["content"]
