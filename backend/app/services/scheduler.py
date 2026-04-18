@@ -114,6 +114,7 @@ async def crawl_creator(creator: Creator) -> int:
                     creator_name=creator.name,
                     platform=creator.platform,
                     video_url=video_to_notify.video_url,
+                    thumbnail_url=video_to_notify.thumbnail_url,
                     is_new_creator=True,
                 )
             else:
@@ -125,6 +126,7 @@ async def crawl_creator(creator: Creator) -> int:
                         creator_name=creator.name,
                         platform=creator.platform,
                         video_url=video.video_url,
+                        thumbnail_url=video.thumbnail_url,
                         is_new_creator=False,
                     )
 
