@@ -77,7 +77,11 @@ class Creator(Base):
     avatar_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    content_type: Mapped[ContentType] = mapped_column(SqlEnum(ContentType), default=ContentType.VIDEO, server_default=ContentType.VIDEO)
+    content_type: Mapped[ContentType] = mapped_column(
+        SqlEnum(ContentType, values_callable=lambda x: [e.value for e in x]),
+        default=ContentType.VIDEO,
+        server_default="video",
+    )
     starred: Mapped[bool] = mapped_column(Boolean, default=False)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
