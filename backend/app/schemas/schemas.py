@@ -89,6 +89,12 @@ class SettingsResponse(BaseModel):
     updated_at: datetime
 
 
+class VideoListResponse(BaseModel):
+    items: list["VideoResponse"]
+    next_cursor: str | None
+    has_more: bool
+
+
 class FeishuWebhookCreate(BaseModel):
     name: str
     webhook_url: str
@@ -124,4 +130,3 @@ class CrawlLogResponse(BaseModel):
     message: str | None
     videos_found: int
     created_at: datetime
-

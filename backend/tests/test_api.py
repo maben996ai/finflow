@@ -364,8 +364,8 @@ class TestVideosAPI:
 
         resp = await client.get("/api/videos", headers=auth_headers)
         assert resp.status_code == 200
-        assert len(resp.json()) == 1
-        assert resp.json()[0]["title"] == "Test Video"
+        assert len(resp.json()["items"]) == 1
+        assert resp.json()["items"][0]["title"] == "Test Video"
 
     async def test_list_videos_filter_by_platform(self, client, auth_headers, db):
         me_resp = await client.get("/api/auth/me", headers=auth_headers)
@@ -374,7 +374,7 @@ class TestVideosAPI:
 
         resp = await client.get("/api/videos?platform=youtube", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.json()["items"] == []
 
     async def test_list_videos_requires_auth(self, client):
         resp = await client.get("/api/videos")
