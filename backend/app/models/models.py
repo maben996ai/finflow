@@ -68,6 +68,8 @@ class Creator(Base):
     profile_url: Mapped[str] = mapped_column(Text())
     avatar_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    starred: Mapped[bool] = mapped_column(Boolean, default=False)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

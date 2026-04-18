@@ -35,6 +35,12 @@ class CreatorCreate(BaseModel):
     note: str | None = None
 
 
+class CreatorUpdate(BaseModel):
+    note: str | None = None
+    category: str | None = None
+    starred: bool | None = None
+
+
 class CreatorResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -45,6 +51,8 @@ class CreatorResponse(BaseModel):
     profile_url: str
     avatar_url: str | None
     note: str | None
+    category: str | None
+    starred: bool
     notifications_enabled: bool
     created_at: datetime
 
