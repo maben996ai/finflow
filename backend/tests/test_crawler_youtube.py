@@ -22,22 +22,22 @@ YOUTUBE_CHANNEL_OK = {
 
 YOUTUBE_HANDLE_ID_OK = {"items": [{"id": "UCxxxxxx"}]}
 
-YOUTUBE_SEARCH_OK = {
+YOUTUBE_PLAYLIST_ITEMS_OK = {
     "items": [
         {
-            "id": {"videoId": "vid001"},
             "snippet": {
                 "title": "Video One",
                 "publishedAt": "2024-01-15T10:00:00Z",
                 "thumbnails": {"high": {"url": "https://example.com/thumb1.jpg"}},
+                "resourceId": {"videoId": "vid001"},
             },
         },
         {
-            "id": {"videoId": "vid002"},
             "snippet": {
                 "title": "Video Two",
                 "publishedAt": "2024-01-10T08:00:00Z",
                 "thumbnails": {},
+                "resourceId": {"videoId": "vid002"},
             },
         },
     ]
@@ -101,8 +101,8 @@ class TestYouTubeResolveCreator:
 class TestYouTubeFetchLatestVideos:
     @respx.mock
     async def test_returns_list_of_crawled_videos(self):
-        respx.get("https://www.googleapis.com/youtube/v3/search").mock(
-            return_value=Response(200, json=YOUTUBE_SEARCH_OK)
+        respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
+            return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
         )
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
@@ -117,8 +117,8 @@ class TestYouTubeFetchLatestVideos:
 
     @respx.mock
     async def test_published_at_is_parsed_from_iso_string(self):
-        respx.get("https://www.googleapis.com/youtube/v3/search").mock(
-            return_value=Response(200, json=YOUTUBE_SEARCH_OK)
+        respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
+            return_value=Response(200, json=YOUTUBE_PLAYLIST_ITEMS_OK)
         )
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
@@ -137,9 +137,9 @@ class TestYouTubeFetchLatestVideos:
 
     @respx.mock
     async def test_items_missing_video_id_are_skipped(self):
-        respx.get("https://www.googleapis.com/youtube/v3/search").mock(
+        respx.get("https://www.googleapis.com/youtube/v3/playlistItems").mock(
             return_value=Response(
-                200, json={"items": [{"id": {}, "snippet": {"title": "no id"}}]}
+                200, json={"items": [{"snippet": {"title": "no id", "resourceId": {}}}]}
             )
         )
 

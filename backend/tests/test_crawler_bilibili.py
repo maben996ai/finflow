@@ -1,6 +1,7 @@
 import respx
 import pytest
 from datetime import UTC, datetime
+from unittest.mock import patch
 from httpx import Response
 
 from app.services.crawlers.bilibili import BilibiliCrawler
@@ -36,6 +37,27 @@ BILIBILI_VIDEO_LIST_OK = {
         }
     }
 }
+
+BILIBILI_FINGER_OK = {"code": 0, "data": {"b_3": "fake-buvid3", "b_4": "fake-buvid4"}}
+
+BILIBILI_NAV_OK = {
+    "code": 0,
+    "data": {
+        "wbi_img": {
+            "img_url": "https://i0.hdslb.com/bfs/wbi/7cd084941338484aae1ad9425b84077c.png",
+            "sub_url": "https://i0.hdslb.com/bfs/wbi/4932caff0ff746eab6f01bf08b70ac45.png",
+        }
+    },
+}
+
+
+def _mock_wbi_prereqs():
+    respx.get("https://api.bilibili.com/x/frontend/finger/spi").mock(
+        return_value=Response(200, json=BILIBILI_FINGER_OK)
+    )
+    respx.get("https://api.bilibili.com/x/web-interface/nav").mock(
+        return_value=Response(200, json=BILIBILI_NAV_OK)
+    )
 
 
 class TestBilibiliResolveCreator:
@@ -89,12 +111,22 @@ class TestBilibiliResolveCreator:
 
 class TestBibiliFetchLatestVideos:
     @respx.mock
+    async def test_no_sessdata_returns_empty(self):
+        with patch("app.services.crawlers.bilibili.settings") as mock_settings:
+            mock_settings.bilibili_sessdata = ""
+            videos = await crawler.fetch_latest_videos("123456")
+        assert videos == []
+
+    @respx.mock
     async def test_returns_list_of_crawled_videos(self):
-        respx.get("https://api.bilibili.com/x/space/arc/search").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/arc/search").mock(
             return_value=Response(200, json=BILIBILI_VIDEO_LIST_OK)
         )
 
-        videos = await crawler.fetch_latest_videos("123456")
+        with patch("app.services.crawlers.bilibili.settings") as mock_settings:
+            mock_settings.bilibili_sessdata = "fake-sessdata"
+            videos = await crawler.fetch_latest_videos("123456")
 
         assert len(videos) == 2
         assert videos[0].platform_video_id == "BV1xx411c7mu"
@@ -105,30 +137,39 @@ class TestBibiliFetchLatestVideos:
 
     @respx.mock
     async def test_published_at_is_utc_aware(self):
-        respx.get("https://api.bilibili.com/x/space/arc/search").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/arc/search").mock(
             return_value=Response(200, json=BILIBILI_VIDEO_LIST_OK)
         )
 
-        videos = await crawler.fetch_latest_videos("123456")
+        with patch("app.services.crawlers.bilibili.settings") as mock_settings:
+            mock_settings.bilibili_sessdata = "fake-sessdata"
+            videos = await crawler.fetch_latest_videos("123456")
         assert videos[0].published_at.tzinfo == UTC
 
     @respx.mock
     async def test_empty_video_list_returns_empty(self):
-        respx.get("https://api.bilibili.com/x/space/arc/search").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/arc/search").mock(
             return_value=Response(200, json={"data": {"list": {"vlist": []}}})
         )
 
-        videos = await crawler.fetch_latest_videos("123456")
+        with patch("app.services.crawlers.bilibili.settings") as mock_settings:
+            mock_settings.bilibili_sessdata = "fake-sessdata"
+            videos = await crawler.fetch_latest_videos("123456")
         assert videos == []
 
     @respx.mock
     async def test_items_missing_bvid_are_skipped(self):
-        respx.get("https://api.bilibili.com/x/space/arc/search").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/arc/search").mock(
             return_value=Response(
                 200,
                 json={"data": {"list": {"vlist": [{"title": "no bvid", "created": 0}]}}},
             )
         )
 
-        videos = await crawler.fetch_latest_videos("123456")
+        with patch("app.services.crawlers.bilibili.settings") as mock_settings:
+            mock_settings.bilibili_sessdata = "fake-sessdata"
+            videos = await crawler.fetch_latest_videos("123456")
         assert videos == []

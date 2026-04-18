@@ -51,16 +51,14 @@ class YouTubeCrawler(BaseCrawler):
         if not settings.youtube_api_key:
             return []
 
-        # TODO: search.list costs 100 quota units per call (vs 1 for most endpoints).
-        # Switch to playlistItems.list on the channel's uploads playlist for 1-unit cost.
+        # uploads playlist ID = replace leading "UC" with "UU"
+        uploads_playlist_id = "UU" + creator_id[2:]
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(
-                "https://www.googleapis.com/youtube/v3/search",
+                "https://www.googleapis.com/youtube/v3/playlistItems",
                 params={
                     "part": "snippet",
-                    "channelId": creator_id,
-                    "type": "video",
-                    "order": "date",
+                    "playlistId": uploads_playlist_id,
                     "maxResults": min(limit, 50),
                     "key": settings.youtube_api_key,
                 },
@@ -70,8 +68,8 @@ class YouTubeCrawler(BaseCrawler):
 
         results: list[CrawledVideo] = []
         for item in payload.get("items") or []:
-            video_id = ((item.get("id") or {}).get("videoId")) or None
             snippet = item.get("snippet") or {}
+            video_id = (snippet.get("resourceId") or {}).get("videoId")
             if not video_id:
                 continue
             published_at = snippet.get("publishedAt")
