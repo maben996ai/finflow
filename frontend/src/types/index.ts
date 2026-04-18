@@ -25,3 +25,8 @@ export interface Video {
   creator_avatar_url?: string | null;
 }
 
+export interface VideoListResponse {
+  items: Video[];
+  next_cursor: string | null;
+  has_more: boolean;
+}

@@ -86,6 +86,12 @@ class SettingsResponse(BaseModel):
     updated_at: datetime
 
 
+class VideoListResponse(BaseModel):
+    items: list["VideoResponse"]
+    next_cursor: str | None
+    has_more: bool
+
+
 class CrawlAcceptedResponse(BaseModel):
     status: CrawlLogStatus
     videos_found: int
