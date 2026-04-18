@@ -14,6 +14,19 @@
       <div class="sidebar-footer">
         <p class="muted sidebar-user">{{ authStore.user?.display_name ?? authStore.user?.email }}</p>
         <button class="btn btn-ghost sidebar-logout" @click="handleLogout">{{ t("nav.signOut") }}</button>
+        <div class="locale-toggle">
+          <button
+            class="locale-link"
+            :class="{ 'locale-link-active': locale === 'zh-CN' }"
+            @click="setLocale('zh-CN')"
+          >中文</button>
+          <span class="locale-sep">/</span>
+          <button
+            class="locale-link"
+            :class="{ 'locale-link-active': locale === 'en' }"
+            @click="setLocale('en')"
+          >EN</button>
+        </div>
       </div>
     </aside>
     <main class="content">
@@ -30,7 +43,7 @@ import { useAuthStore } from "../../stores/auth";
 
 const router = useRouter();
 const authStore = useAuthStore();
-const { t } = useI18n();
+const { t, locale, setLocale } = useI18n();
 
 function handleLogout() {
   authStore.logout();

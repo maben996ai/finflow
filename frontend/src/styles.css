@@ -34,41 +34,32 @@ a {
   min-height: 100vh;
 }
 
-.locale-switcher {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  z-index: 20;
-  display: inline-flex;
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  background: rgba(8, 12, 18, 0.72);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+.locale-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.locale-option {
+.locale-link {
   border: none;
-  border-radius: 999px;
-  padding: 8px 12px;
   background: transparent;
-  color: rgba(245, 241, 232, 0.8);
+  color: rgba(245, 241, 232, 0.28);
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  padding: 0;
+  transition: color 160ms ease;
 }
 
-.locale-option.active {
-  background: linear-gradient(135deg, #e77a45, #efb767);
-  color: #10161d;
-  font-weight: 700;
+.locale-link:hover,
+.locale-link-active {
+  color: rgba(245, 241, 232, 0.6);
 }
 
-.locale-option:hover {
-  color: #f5f1e8;
+.locale-sep {
+  color: rgba(245, 241, 232, 0.16);
+  font-size: 0.74rem;
+  user-select: none;
 }
 
 .shell {
@@ -292,6 +283,309 @@ a {
 .auth-footer a {
   color: #f0b37a;
   text-decoration: underline;
+}
+
+/* ── Creators ─────────────────────────────────────────────── */
+
+.add-form {
+  display: grid;
+  gap: 10px;
+}
+
+.add-row {
+  display: flex;
+  gap: 10px;
+}
+
+.add-input {
+  flex: 1;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f5f1e8;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.add-input:focus {
+  border-color: rgba(231, 122, 69, 0.6);
+}
+
+.add-input::placeholder {
+  color: rgba(245, 241, 232, 0.32);
+}
+
+.creator-list {
+  display: grid;
+  gap: 12px;
+}
+
+.creator-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+.creator-row-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.creator-row-avatar-placeholder {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.creator-row-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.creator-row-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.creator-row-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.creator-row-name:hover {
+  text-decoration: underline;
+}
+
+.creator-row-note {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.starred-badge {
+  color: #efb767;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.category-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.74rem;
+  color: rgba(245, 241, 232, 0.72);
+}
+
+.creator-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(245, 241, 232, 0.6);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f5f1e8;
+}
+
+.btn-icon.delete-btn:hover {
+  background: rgba(220, 60, 60, 0.2);
+  color: #f08080;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  margin: 16px;
+}
+
+.modal h3 {
+  margin: 0 0 4px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Feed ──────────────────────────────────────────────────── */
+
+.feed-filters {
+  display: inline-flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(8, 12, 18, 0.44);
+}
+
+.filter-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: transparent;
+  color: rgba(245, 241, 232, 0.72);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.filter-btn.active {
+  background: linear-gradient(135deg, #e77a45, #efb767);
+  color: #10161d;
+  font-weight: 700;
+}
+
+.filter-btn:hover:not(.active) {
+  color: #f5f1e8;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.feed-state {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.video-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+  overflow: hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.video-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.28);
+}
+
+.video-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.video-thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.platform-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.platform-badge.youtube {
+  background: rgba(255, 0, 0, 0.82);
+  color: #fff;
+}
+
+.platform-badge.bilibili {
+  background: rgba(0, 160, 214, 0.82);
+  color: #fff;
+}
+
+.video-info {
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.video-title {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+}
+
+.creator-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.video-creator {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.video-date {
+  flex-shrink: 0;
 }
 
 @media (max-width: 900px) {

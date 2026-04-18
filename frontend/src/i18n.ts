@@ -24,23 +24,31 @@ const messages = {
     feed: {
       eyebrow: "内容动态",
       title: "在同一时间线中追踪 Bilibili 与 YouTube 创作者更新。",
-      status: "初始化阶段",
-      cards: {
-        bilibiliPlatform: "Bilibili",
-        bilibiliTitle: "统一视频流",
-        bilibiliDescription: "视频卡片、时间线排序和平台筛选都会在这里落地。",
-        youtubePlatform: "YouTube",
-        youtubeTitle: "可通知工作流",
-        youtubeDescription: "飞书配置和抓取自动化已经在后端完成脚手架。",
-        systemPlatform: "系统",
-        systemTitle: "可组合架构",
-        systemDescription: "页面已经接入 Vue Router，随时可以连接 API 驱动的 store。",
-      },
+      filterAll: "全部",
+      filterBilibili: "Bilibili",
+      filterYoutube: "YouTube",
+      loading: "加载中…",
+      empty: "暂无视频，先去添加创作者并触发抓取吧。",
+      fetchError: "加载失败，请稍后重试。",
     },
     creators: {
       eyebrow: "创作者",
-      title: "创作者管理页面",
-      description: "后续接上 API 后，你可以在这里新增、删除和标注订阅的创作者。",
+      title: "创作者管理",
+      addPlaceholder: "粘贴 Bilibili 或 YouTube 主页链接",
+      addButton: "添加",
+      adding: "添加中…",
+      empty: "还没有订阅的创作者，粘贴主页链接开始添加。",
+      loading: "加载中…",
+      fetchError: "加载失败，请稍后重试。",
+      addError: "添加失败，请检查链接格式或网络。",
+      deleteConfirm: "确认删除该创作者？",
+      notePlaceholder: "备注（可选）",
+      categoryPlaceholder: "分类（可选）",
+      save: "保存",
+      cancel: "取消",
+      starred: "特别关注",
+      platformBilibili: "Bilibili",
+      platformYoutube: "YouTube",
     },
     settings: {
       eyebrow: "设置",
@@ -94,23 +102,31 @@ const messages = {
     feed: {
       eyebrow: "Live Feed",
       title: "Track creators across Bilibili and YouTube in one timeline.",
-      status: "Bootstrap state",
-      cards: {
-        bilibiliPlatform: "Bilibili",
-        bilibiliTitle: "Unified video feed",
-        bilibiliDescription: "Video cards, timeline sorting and platform filtering will land here.",
-        youtubePlatform: "YouTube",
-        youtubeTitle: "Notification-ready workflow",
-        youtubeDescription: "Feishu settings and crawl automation are scaffolded on the backend.",
-        systemPlatform: "System",
-        systemTitle: "Composable architecture",
-        systemDescription: "This page is wired through Vue Router and ready for API-backed stores.",
-      },
+      filterAll: "All",
+      filterBilibili: "Bilibili",
+      filterYoutube: "YouTube",
+      loading: "Loading…",
+      empty: "No videos yet. Add a creator and trigger a crawl first.",
+      fetchError: "Failed to load. Please try again.",
     },
     creators: {
       eyebrow: "Creators",
-      title: "Creator management scaffold",
-      description: "Add, delete and annotate creator subscriptions here after API wiring.",
+      title: "Creators",
+      addPlaceholder: "Paste a Bilibili or YouTube channel URL",
+      addButton: "Add",
+      adding: "Adding…",
+      empty: "No creators yet. Paste a channel URL to get started.",
+      loading: "Loading…",
+      fetchError: "Failed to load. Please try again.",
+      addError: "Failed to add. Check the URL format or your connection.",
+      deleteConfirm: "Delete this creator?",
+      notePlaceholder: "Note (optional)",
+      categoryPlaceholder: "Category (optional)",
+      save: "Save",
+      cancel: "Cancel",
+      starred: "Starred",
+      platformBilibili: "Bilibili",
+      platformYoutube: "YouTube",
     },
     settings: {
       eyebrow: "Settings",
@@ -162,19 +178,29 @@ type MessageKey =
   | "nav.signOut"
   | "feed.eyebrow"
   | "feed.title"
-  | "feed.status"
-  | "feed.cards.bilibiliPlatform"
-  | "feed.cards.bilibiliTitle"
-  | "feed.cards.bilibiliDescription"
-  | "feed.cards.youtubePlatform"
-  | "feed.cards.youtubeTitle"
-  | "feed.cards.youtubeDescription"
-  | "feed.cards.systemPlatform"
-  | "feed.cards.systemTitle"
-  | "feed.cards.systemDescription"
+  | "feed.filterAll"
+  | "feed.filterBilibili"
+  | "feed.filterYoutube"
+  | "feed.loading"
+  | "feed.empty"
+  | "feed.fetchError"
   | "creators.eyebrow"
   | "creators.title"
-  | "creators.description"
+  | "creators.addPlaceholder"
+  | "creators.addButton"
+  | "creators.adding"
+  | "creators.empty"
+  | "creators.loading"
+  | "creators.fetchError"
+  | "creators.addError"
+  | "creators.deleteConfirm"
+  | "creators.notePlaceholder"
+  | "creators.categoryPlaceholder"
+  | "creators.save"
+  | "creators.cancel"
+  | "creators.starred"
+  | "creators.platformBilibili"
+  | "creators.platformYoutube"
   | "settings.eyebrow"
   | "settings.title"
   | "settings.description"
