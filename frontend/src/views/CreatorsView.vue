@@ -7,36 +7,34 @@
         <h2>{{ t("creators.title") }}</h2>
       </div>
       <div class="feed-filters">
-        <button class="filter-btn" :class="{ active: contentType === 'video' }" @click="contentType = 'video'">{{ t("creators.tabVideos") }}</button>
-        <button class="filter-btn" :class="{ active: contentType === 'article' }" @click="contentType = 'article'">{{ t("creators.tabArticles") }}</button>
-        <button class="filter-btn" :class="{ active: contentType === 'news' }" @click="contentType = 'news'">{{ t("creators.tabNews") }}</button>
-        <button class="filter-btn" :class="{ active: contentType === 'market' }" @click="contentType = 'market'">{{ t("creators.tabMarket") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'video' }" @click="switchTab('video')">{{ t("creators.tabVideos") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'article' }" @click="switchTab('article')">{{ t("creators.tabArticles") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'news' }" @click="switchTab('news')">{{ t("creators.tabNews") }}</button>
+        <button class="filter-btn" :class="{ active: contentType === 'market' }" @click="switchTab('market')">{{ t("creators.tabMarket") }}</button>
       </div>
     </div>
 
-    <!-- 资讯/市场留白 -->
-    <template v-if="contentType === 'news' || contentType === 'market'">
-      <div class="panel feed-state">
-        <p class="muted">{{ t("creators.comingSoon") }}</p>
-      </div>
-    </template>
-
-    <template v-else>
+    <!-- 新增表单（news / market 暂不支持 URL 解析，显示提示） -->
     <div class="panel add-form">
-      <form class="add-row" @submit.prevent="handleAdd">
-        <input
-          v-model="addUrl"
-          class="add-input"
-          type="url"
-          :placeholder="t('creators.addPlaceholder')"
-          :disabled="adding"
-          required
-        />
-        <button class="btn" type="submit" :disabled="adding || !addUrl.trim()">
-          {{ adding ? t("creators.adding") : t("creators.addButton") }}
-        </button>
-      </form>
-      <p v-if="addError" class="error-msg">{{ t("creators.addError") }}</p>
+      <template v-if="contentType === 'news' || contentType === 'market'">
+        <p class="muted">{{ t("creators.comingSoon") }}</p>
+      </template>
+      <template v-else>
+        <form class="add-row" @submit.prevent="handleAdd">
+          <input
+            v-model="addUrl"
+            class="add-input"
+            type="url"
+            :placeholder="t('creators.addPlaceholder')"
+            :disabled="adding"
+            required
+          />
+          <button class="btn" type="submit" :disabled="adding || !addUrl.trim()">
+            {{ adding ? t("creators.adding") : t("creators.addButton") }}
+          </button>
+        </form>
+        <p v-if="addError" class="error-msg">{{ t("creators.addError") }}</p>
+      </template>
     </div>
 
     <!-- 列表 -->
@@ -72,7 +70,6 @@
         </div>
       </div>
     </div>
-    </template>
 
     <!-- 编辑弹层 -->
     <div v-if="editTarget" class="modal-backdrop" @click.self="editTarget = null">
@@ -86,6 +83,15 @@
           <div class="field">
             <label>{{ t("creators.categoryPlaceholder") }}</label>
             <input v-model="editCategory" type="text" :placeholder="t('creators.categoryPlaceholder')" />
+          </div>
+          <div class="field">
+            <label>内容类型</label>
+            <select v-model="editContentType">
+              <option value="video">视频</option>
+              <option value="article">文章</option>
+              <option value="news">资讯</option>
+              <option value="market">市场</option>
+            </select>
           </div>
           <div class="modal-actions">
             <button class="btn" @click="submitEdit">{{ t("creators.save") }}</button>
@@ -102,11 +108,11 @@ import { onMounted, ref } from "vue";
 
 import { creatorsApi } from "../api/creators";
 import { useI18n } from "../i18n";
-import type { Creator } from "../types";
+import type { ContentType, Creator } from "../types";
 
 const { t } = useI18n();
 
-const contentType = ref<"video" | "article" | "news" | "market">("video");
+const contentType = ref<ContentType>("video");
 const creators = ref<Creator[]>([]);
 const loading = ref(false);
 const fetchError = ref(false);
@@ -118,12 +124,13 @@ const addError = ref(false);
 const editTarget = ref<Creator | null>(null);
 const editNote = ref("");
 const editCategory = ref("");
+const editContentType = ref<ContentType>("video");
 
 async function fetchCreators() {
   loading.value = true;
   fetchError.value = false;
   try {
-    const resp = await creatorsApi.list();
+    const resp = await creatorsApi.list({ content_type: contentType.value });
     creators.value = resp.data;
   } catch {
     fetchError.value = true;
@@ -132,11 +139,16 @@ async function fetchCreators() {
   }
 }
 
+function switchTab(tab: ContentType) {
+  contentType.value = tab;
+  fetchCreators();
+}
+
 async function handleAdd() {
   addError.value = false;
   adding.value = true;
   try {
-    const resp = await creatorsApi.create({ url: addUrl.value.trim() });
+    const resp = await creatorsApi.create({ url: addUrl.value.trim(), content_type: contentType.value });
     creators.value.unshift(resp.data);
     addUrl.value = "";
   } catch {
@@ -162,6 +174,7 @@ function startEdit(creator: Creator) {
   editTarget.value = creator;
   editNote.value = creator.note ?? "";
   editCategory.value = creator.category ?? "";
+  editContentType.value = creator.content_type;
 }
 
 async function submitEdit() {
@@ -169,10 +182,15 @@ async function submitEdit() {
   const resp = await creatorsApi.patch(editTarget.value.id, {
     note: editNote.value || null,
     category: editCategory.value || null,
+    content_type: editContentType.value,
   });
   const idx = creators.value.findIndex((c) => c.id === editTarget.value!.id);
   if (idx !== -1) creators.value[idx] = resp.data;
   editTarget.value = null;
+  // 如果类型改变了，从当前 tab 的列表中移除
+  if (resp.data.content_type !== contentType.value) {
+    creators.value = creators.value.filter((c) => c.id !== resp.data.id);
+  }
 }
 
 onMounted(fetchCreators);

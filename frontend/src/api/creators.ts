@@ -1,13 +1,14 @@
 import { apiClient } from "./client";
+import type { ContentType } from "../types";
 
 export const creatorsApi = {
-  list(params?: { starred?: boolean }) {
+  list(params?: { starred?: boolean; content_type?: ContentType }) {
     return apiClient.get("/creators", { params });
   },
-  create(payload: { url: string; note?: string }) {
+  create(payload: { url: string; note?: string; content_type?: ContentType }) {
     return apiClient.post("/creators", payload);
   },
-  patch(id: string, payload: { note?: string | null; category?: string | null; starred?: boolean }) {
+  patch(id: string, payload: { note?: string | null; category?: string | null; starred?: boolean; content_type?: ContentType }) {
     return apiClient.patch(`/creators/${id}`, payload);
   },
   remove(id: string) {

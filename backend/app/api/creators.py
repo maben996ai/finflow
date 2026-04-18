@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.models import CrawlLogStatus, Creator, User
+from app.models.models import ContentType, CrawlLogStatus, Creator, User
 from app.schemas.schemas import CrawlAcceptedResponse, CreatorCreate, CreatorResponse, CreatorUpdate
 from app.services.resolver import resolve_creator
 from app.services.scheduler import crawl_creator
@@ -15,6 +15,7 @@ router = APIRouter()
 @router.get("", response_model=list[CreatorResponse])
 async def list_creators(
     starred: bool | None = Query(default=None),
+    content_type: ContentType | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Creator]:
@@ -25,6 +26,8 @@ async def list_creators(
     )
     if starred is not None:
         stmt = stmt.where(Creator.starred == starred)
+    if content_type is not None:
+        stmt = stmt.where(Creator.content_type == content_type)
     result = await db.scalars(stmt)
     return list(result)
 
@@ -63,6 +66,7 @@ async def create_creator(
         profile_url=resolved.profile_url,
         avatar_url=resolved.avatar_url,
         note=payload.note,
+        content_type=payload.content_type,
     )
     db.add(creator)
     await db.commit()
@@ -90,6 +94,8 @@ async def update_creator(
     creator.category = payload.category
     if payload.starred is not None:
         creator.starred = payload.starred
+    if payload.content_type is not None:
+        creator.content_type = payload.content_type
     await db.commit()
     await db.refresh(creator)
     return creator

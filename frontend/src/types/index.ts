@@ -1,3 +1,5 @@
+export type ContentType = "video" | "article" | "news" | "market";
+
 export interface Creator {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export interface Creator {
   avatar_url?: string | null;
   note?: string | null;
   category?: string | null;
+  content_type: ContentType;
   starred: boolean;
   notifications_enabled: boolean;
   created_at: string;

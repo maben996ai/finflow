@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.models import CrawlLogStatus, Platform
+from app.models.models import ContentType, CrawlLogStatus, Platform
 
 
 class UserCreate(BaseModel):
@@ -33,12 +33,14 @@ class TokenResponse(BaseModel):
 class CreatorCreate(BaseModel):
     url: str
     note: str | None = None
+    content_type: ContentType = ContentType.VIDEO
 
 
 class CreatorUpdate(BaseModel):
     note: str | None = None
     category: str | None = None
     starred: bool | None = None
+    content_type: ContentType | None = None
 
 
 class CreatorResponse(BaseModel):
@@ -52,6 +54,7 @@ class CreatorResponse(BaseModel):
     avatar_url: str | None
     note: str | None
     category: str | None
+    content_type: ContentType
     starred: bool
     notifications_enabled: bool
     created_at: datetime
