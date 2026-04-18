@@ -16,6 +16,13 @@ class Platform(StrEnum):
     YOUTUBE = "youtube"
 
 
+class ContentType(StrEnum):
+    VIDEO = "video"
+    ARTICLE = "article"
+    NEWS = "news"
+    MARKET = "market"
+
+
 class CrawlLogStatus(StrEnum):
     SUCCESS = "success"
     FAILED = "failed"
@@ -36,6 +43,7 @@ class User(Base):
 
     creators: Mapped[list["Creator"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     settings: Mapped["UserSettings | None"] = relationship(back_populates="user", cascade="all, delete-orphan")
+    feishu_webhooks: Mapped[list["FeishuWebhook"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
 
 class UserSettings(Base):
@@ -69,6 +77,11 @@ class Creator(Base):
     avatar_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     note: Mapped[str | None] = mapped_column(String(255), nullable=True)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    content_type: Mapped[ContentType] = mapped_column(
+        SqlEnum(ContentType, values_callable=lambda x: [e.value for e in x]),
+        default=ContentType.VIDEO,
+        server_default="video",
+    )
     starred: Mapped[bool] = mapped_column(Boolean, default=False)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -100,6 +113,19 @@ class Video(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     creator: Mapped[Creator] = relationship(back_populates="videos")
+
+
+class FeishuWebhook(Base):
+    __tablename__ = "feishu_webhooks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(100))
+    webhook_url: Mapped[str] = mapped_column(Text())
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="feishu_webhooks")
 
 
 class CrawlLog(Base):

@@ -3,19 +3,44 @@
     <div class="panel">
       <p class="eyebrow">通知配置</p>
       <h2>飞书 Webhook</h2>
-      <p class="muted">配置飞书群机器人 Webhook 地址，抓取到新内容时自动推送通知。</p>
+      <p class="muted">配置飞书群机器人 Webhook，抓取到新内容时同步推送到多个群。</p>
 
-      <el-form :model="form" label-position="top" style="margin-top: 16px; max-width: 560px">
+      <!-- 已有 webhook 列表 -->
+      <el-table :data="webhooks" style="margin-top: 16px" v-loading="loading">
+        <el-table-column label="群名称" prop="name" min-width="120" />
+        <el-table-column label="Webhook 地址" prop="webhook_url" min-width="300">
+          <template #default="{ row }">
+            <span class="muted" style="font-size: 12px; word-break: break-all">{{ row.webhook_url }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="80">
+          <template #default="{ row }">
+            <el-switch :model-value="row.enabled" @change="(val: boolean) => toggleEnabled(row, val)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="140">
+          <template #default="{ row }">
+            <el-button size="small" :loading="testingId === row.id" @click="sendTest(row)">测试</el-button>
+            <el-button size="small" type="danger" @click="remove(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 新增表单 -->
+      <el-form :model="form" inline style="margin-top: 16px">
+        <el-form-item label="群名称">
+          <el-input v-model="form.name" placeholder="港股研究群" style="width: 140px" />
+        </el-form-item>
         <el-form-item label="Webhook 地址">
           <el-input
-            v-model="form.feishu_webhook_url"
+            v-model="form.webhook_url"
             placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+            style="width: 360px"
             clearable
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" :loading="saving" @click="save">保存</el-button>
-          <el-button :loading="testing" @click="test" style="margin-left: 8px">发送测试消息</el-button>
+          <el-button type="primary" :loading="creating" @click="create">添加</el-button>
         </el-form-item>
       </el-form>
     </div>
@@ -24,47 +49,74 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { ElMessage } from "element-plus";
-import { settingsApi } from "../api/settings";
+import { ElMessage, ElMessageBox } from "element-plus";
+import { webhooksApi, type FeishuWebhook } from "../api/webhooks";
 
-const form = ref({ feishu_webhook_url: "" });
-const saving = ref(false);
-const testing = ref(false);
+const webhooks = ref<FeishuWebhook[]>([]);
+const loading = ref(false);
+const creating = ref(false);
+const testingId = ref<string | null>(null);
+const form = ref({ name: "", webhook_url: "" });
 
-onMounted(async () => {
+async function load() {
+  loading.value = true;
   try {
-    const res = await settingsApi.getFeishu();
-    form.value.feishu_webhook_url = res.data.feishu_webhook_url ?? "";
-  } catch {
-    // ignore
-  }
-});
-
-async function save() {
-  saving.value = true;
-  try {
-    await settingsApi.updateFeishu({ feishu_webhook_url: form.value.feishu_webhook_url || null });
-    ElMessage.success("保存成功");
-  } catch {
-    ElMessage.error("保存失败");
+    const res = await webhooksApi.list();
+    webhooks.value = res.data;
   } finally {
-    saving.value = false;
+    loading.value = false;
   }
 }
 
-async function test() {
-  if (!form.value.feishu_webhook_url) {
-    ElMessage.warning("请先填写 Webhook 地址");
+onMounted(load);
+
+async function create() {
+  if (!form.value.name || !form.value.webhook_url) {
+    ElMessage.warning("请填写群名称和 Webhook 地址");
     return;
   }
-  testing.value = true;
+  creating.value = true;
   try {
-    await settingsApi.testFeishu();
-    ElMessage.success("测试消息已发送，请查看飞书群");
+    await webhooksApi.create(form.value);
+    form.value = { name: "", webhook_url: "" };
+    ElMessage.success("添加成功");
+    await load();
   } catch {
-    ElMessage.error("发送失败，请检查 Webhook 地址是否正确");
+    ElMessage.error("添加失败");
   } finally {
-    testing.value = false;
+    creating.value = false;
+  }
+}
+
+async function toggleEnabled(row: FeishuWebhook, val: boolean) {
+  try {
+    await webhooksApi.update(row.id, { enabled: val });
+    row.enabled = val;
+  } catch {
+    ElMessage.error("更新失败");
+  }
+}
+
+async function sendTest(row: FeishuWebhook) {
+  testingId.value = row.id;
+  try {
+    await webhooksApi.test(row.id);
+    ElMessage.success(`测试消息已发送到「${row.name}」`);
+  } catch {
+    ElMessage.error("发送失败，请检查 Webhook 地址");
+  } finally {
+    testingId.value = null;
+  }
+}
+
+async function remove(row: FeishuWebhook) {
+  await ElMessageBox.confirm(`确认删除「${row.name}」？`, "删除确认", { type: "warning" });
+  try {
+    await webhooksApi.delete(row.id);
+    ElMessage.success("已删除");
+    await load();
+  } catch {
+    ElMessage.error("删除失败");
   }
 }
 </script>

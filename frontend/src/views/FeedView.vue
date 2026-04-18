@@ -45,7 +45,7 @@
             class="video-card-sm"
           >
             <div class="video-thumb-sm">
-              <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" />
+              <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
               <div v-else class="video-thumb-placeholder" />
               <span class="platform-badge" :class="video.platform">{{ video.platform }}</span>
             </div>
@@ -70,7 +70,7 @@
       <template v-else>
         <div v-for="group in authorGroups" :key="group.creatorId" class="author-group">
           <div class="author-group-header">
-            <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.creatorName" />
+            <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.creatorName" referrerpolicy="no-referrer" />
             <div v-else class="creator-avatar creator-avatar-placeholder" />
             <RouterLink :to="`/author/${group.creatorId}`" class="author-group-name">{{ group.creatorName }}</RouterLink>
             <span class="platform-badge" :class="group.platform">{{ group.platform }}</span>
@@ -88,7 +88,7 @@
               class="video-card-sm"
             >
               <div class="video-thumb-sm">
-                <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" />
+                <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
                 <div v-else class="video-thumb-placeholder" />
               </div>
               <div class="video-info-sm">

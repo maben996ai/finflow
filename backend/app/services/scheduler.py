@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import func, select
 
 from app.core.database import AsyncSessionLocal
-from app.models.models import CrawlLogStatus, Creator, CrawlLog, UserSettings, Video
+from app.models.models import CrawlLogStatus, Creator, CrawlLog, FeishuWebhook, Video
 from app.services.crawlers.registry import crawler_registry
 from app.services.notifiers.feishu import FeishuNotifier
 
@@ -34,10 +34,12 @@ FIRST_CRAWL_LIMIT = 30
 INCREMENTAL_CRAWL_LIMIT = 2
 
 
-async def _get_webhook_url(user_id: str) -> str | None:
+async def _get_webhook_urls(user_id: str) -> list[str]:
     async with AsyncSessionLocal() as db:
-        settings = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-        return settings.feishu_webhook_url if settings else None
+        rows = await db.scalars(
+            select(FeishuWebhook).where(FeishuWebhook.user_id == user_id, FeishuWebhook.enabled.is_(True))
+        )
+        return [r.webhook_url for r in rows]
 
 
 async def crawl_creator(creator: Creator) -> int:
@@ -103,10 +105,9 @@ async def crawl_creator(creator: Creator) -> int:
 
     # Send notifications after commit
     if creator.notifications_enabled and inserted_videos:
-        webhook_url = await _get_webhook_url(creator.user_id)
-        if webhook_url:
+        webhook_urls = await _get_webhook_urls(creator.user_id)
+        for webhook_url in webhook_urls:
             if is_first_crawl:
-                # First crawl: notify only the latest video (first in list), mark as new creator
                 video_to_notify = inserted_videos[0]
                 await _notifier.send_card(
                     webhook_url=webhook_url,
@@ -114,10 +115,10 @@ async def crawl_creator(creator: Creator) -> int:
                     creator_name=creator.name,
                     platform=creator.platform,
                     video_url=video_to_notify.video_url,
+                    thumbnail_url=video_to_notify.thumbnail_url,
                     is_new_creator=True,
                 )
             else:
-                # Incremental: notify all new videos
                 for video in inserted_videos:
                     await _notifier.send_card(
                         webhook_url=webhook_url,
@@ -125,6 +126,7 @@ async def crawl_creator(creator: Creator) -> int:
                         creator_name=creator.name,
                         platform=creator.platform,
                         video_url=video.video_url,
+                        thumbnail_url=video.thumbnail_url,
                         is_new_creator=False,
                     )
 

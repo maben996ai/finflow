@@ -54,10 +54,11 @@ async def test_feishu_webhook(
         return {"status": "error", "message": "未配置 Webhook 地址"}
     await _notifier.send_card(
         webhook_url=settings.feishu_webhook_url,
-        title="FinFlow 通知测试",
+        title="FinFlow 通知测试 - 飞书推送已就绪",
         creator_name="测试创作者",
         platform="bilibili",
         video_url="https://www.bilibili.com",
+        thumbnail_url="https://i0.hdslb.com/bfs/archive/d6e2b3ee64571c67ec534f39a3ab33380d2e0c4a.jpg",
         is_new_creator=False,
     )
     return {"status": "ok"}

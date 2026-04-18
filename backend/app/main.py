@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, crawl_logs, creators, settings, videos
+from app.api import auth, crawl_logs, creators, settings, videos, webhooks
 from app.core.database import init_db
 from app.services.scheduler import scheduler_service
 
@@ -44,4 +44,5 @@ app.include_router(creators.router, prefix="/api/creators", tags=["creators"])
 app.include_router(videos.router, prefix="/api/videos", tags=["videos"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(crawl_logs.router, prefix="/api/crawl-logs", tags=["crawl-logs"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
