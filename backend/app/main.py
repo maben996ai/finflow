@@ -19,7 +19,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(
-    title="FinFlow API",
+    title="TrendRadar API",
     description="Financial creator feed aggregation service",
     version="0.1.0",
     lifespan=lifespan,
@@ -45,4 +45,3 @@ app.include_router(videos.router, prefix="/api/videos", tags=["videos"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(crawl_logs.router, prefix="/api/crawl-logs", tags=["crawl-logs"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
-

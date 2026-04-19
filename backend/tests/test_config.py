@@ -6,7 +6,7 @@ from app.core.config import Settings, get_settings
 
 def test_settings_has_default_app_name():
     s = Settings(_env_file=None)
-    assert s.app_name == "FinFlow"
+    assert s.app_name == "TrendRadar"
 
 
 def test_settings_default_types():
@@ -17,6 +17,9 @@ def test_settings_default_types():
     assert isinstance(s.access_token_expire_minutes, int)
     assert isinstance(s.youtube_api_key, str)
     assert isinstance(s.bilibili_sessdata, str)
+    assert isinstance(s.dev_account_email, str)
+    assert isinstance(s.dev_account_display_name, str)
+    assert isinstance(s.dev_account_password, str)
 
 
 def test_settings_access_token_default():
@@ -24,32 +27,31 @@ def test_settings_access_token_default():
     assert s.access_token_expire_minutes == 43200
 
 
-def test_settings_reads_from_env_file():
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write("SECRET_KEY=test-secret-from-env\n")
-        f.write("ACCESS_TOKEN_EXPIRE_MINUTES=60\n")
-        env_path = f.name
-
-    try:
-        s = Settings(_env_file=env_path)
-        assert s.secret_key == "test-secret-from-env"
-        assert s.access_token_expire_minutes == 60
-    finally:
-        os.unlink(env_path)
+def test_settings_dev_account_defaults():
+    s = Settings(_env_file=None)
+    assert s.dev_account_email == "maben996@gmail.com"
+    assert s.dev_account_display_name == "maben996"
+    assert s.dev_account_password == ""
 
 
-def test_settings_env_overrides_default():
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".env", delete=False) as f:
-        f.write("YOUTUBE_API_KEY=my-youtube-key\n")
-        f.write("BILIBILI_SESSDATA=my-sessdata\n")
-        env_path = f.name
+def test_settings_reads_from_environment(monkeypatch):
+    monkeypatch.setenv("SECRET_KEY", "test-secret-from-env")
+    monkeypatch.setenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 
-    try:
-        s = Settings(_env_file=env_path)
-        assert s.youtube_api_key == "my-youtube-key"
-        assert s.bilibili_sessdata == "my-sessdata"
-    finally:
-        os.unlink(env_path)
+    s = Settings(_env_file=None)
+
+    assert s.secret_key == "test-secret-from-env"
+    assert s.access_token_expire_minutes == 60
+
+
+def test_settings_environment_overrides_default(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_API_KEY", "my-youtube-key")
+    monkeypatch.setenv("BILIBILI_SESSDATA", "my-sessdata")
+
+    s = Settings(_env_file=None)
+
+    assert s.youtube_api_key == "my-youtube-key"
+    assert s.bilibili_sessdata == "my-sessdata"
 
 
 def test_get_settings_returns_same_instance():

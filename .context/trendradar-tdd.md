@@ -1,8 +1,8 @@
-# FinFlow 技术方案文档
+# TrendRadar 技术方案文档
 
 > **版本：** v1.0
 > **日期：** 2026-04-12
-> **作者：** FinFlow 团队
+> **作者：** TrendRadar 团队
 > **对应 PRD：** context/prd.md v1.0
 
 ---
@@ -127,7 +127,7 @@ graph LR
 ## 三、项目文件结构设计
 
 ```
-finflow/
+trendradar/
 ├── context/                         # 项目文档
 │   ├── prd.md
 │   └── tech-spec.md                 # 本文档
@@ -852,7 +852,7 @@ chore(docker): add redis service to compose
 - 所有变量必须在 `.env.example` 中有占位说明
 
 ```env
-DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/finflow
+DATABASE_URL=postgresql+asyncpg://user:password@postgres:5432/trendradar
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your-secret-key
 ACCESS_TOKEN_EXPIRE_MINUTES=43200
@@ -881,8 +881,8 @@ BILIBILI_SESSDATA=                   # 可选，一期留空
 **克隆项目并初始化目录**
 
 ```bash
-git clone <repo-url> finflow
-cd finflow
+git clone <repo-url> trendradar
+cd trendradar
 
 # 创建后端虚拟环境
 python -m venv backend/.venv

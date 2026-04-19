@@ -2,7 +2,7 @@ import { computed, ref, watch } from "vue";
 
 export type Locale = "zh-CN" | "en";
 
-const LOCALE_KEY = "finflow_locale";
+const LOCALE_KEY = "trendradar_locale";
 const defaultLocale: Locale = "zh-CN";
 
 const messages = {
@@ -13,8 +13,8 @@ const messages = {
       switchToEnglish: "Switch to English",
     },
     nav: {
-      product: "FinFlow",
-      title: "金融流",
+      product: "TrendRadar",
+      title: "信号台",
       feed: "动态资讯",
       creators: "信源管理",
       settings: "设置",
@@ -82,7 +82,7 @@ const messages = {
     },
     auth: {
       loginEyebrow: "欢迎回来",
-      loginTitle: "登录 FinFlow",
+      loginTitle: "登录 TrendRadar",
       registerEyebrow: "新建工作区",
       registerTitle: "创建你的账号",
       email: "邮箱",
@@ -111,8 +111,8 @@ const messages = {
       switchToEnglish: "Switch to English",
     },
     nav: {
-      product: "FinFlow",
-      title: "金融流",
+      product: "TrendRadar",
+      title: "Signal Desk",
       feed: "Latest Updates",
       creators: "Sources",
       settings: "Settings",
@@ -180,7 +180,7 @@ const messages = {
     },
     auth: {
       loginEyebrow: "Welcome back",
-      loginTitle: "Sign in to FinFlow",
+      loginTitle: "Sign in to TrendRadar",
       registerEyebrow: "New workspace",
       registerTitle: "Create your account",
       email: "Email",

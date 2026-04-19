@@ -5,11 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 ROOT_DIR = Path(__file__).resolve().parents[3]
-DEFAULT_SQLITE_PATH = ROOT_DIR / "backend" / "data" / "finflow.db"
+DEFAULT_SQLITE_PATH = ROOT_DIR / "backend" / "data" / "trendradar.db"
 
 
 class Settings(BaseSettings):
-    app_name: str = "FinFlow"
+    app_name: str = "TrendRadar"
     api_prefix: str = "/api"
     database_url: str = f"sqlite+aiosqlite:///{DEFAULT_SQLITE_PATH.as_posix()}"
     redis_url: str = "redis://localhost:6379/0"
@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     nginx_conf_file: str = "nginx.http.conf"
     feishu_app_id: str = ""
     feishu_app_secret: str = ""
+    dev_account_email: str = "maben996@gmail.com"
+    dev_account_display_name: str = "maben996"
+    dev_account_password: str = ""
 
     model_config = SettingsConfigDict(
         env_file=str(ROOT_ENV_FILE),

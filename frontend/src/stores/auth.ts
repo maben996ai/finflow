@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 
 import { authApi } from "../api/auth";
 
-const TOKEN_KEY = "finflow_token";
+const TOKEN_KEY = "trendradar_token";
 
 export const useAuthStore = defineStore("auth", () => {
   const token = ref<string | null>(localStorage.getItem(TOKEN_KEY));
