@@ -1,10 +1,7 @@
 <template>
   <div class="shell">
     <aside class="sidebar">
-      <div>
-        <p class="eyebrow">{{ t("nav.product") }}</p>
-        <h1>{{ t("nav.title") }}</h1>
-      </div>
+      <h1 class="sidebar-logo">TrendRadar</h1>
       <nav class="nav">
         <RouterLink to="/">{{ t("nav.feed") }}</RouterLink>
         <RouterLink to="/sources">{{ t("nav.dataSources") }}</RouterLink>

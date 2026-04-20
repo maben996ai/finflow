@@ -13,12 +13,8 @@ const messages = {
       switchToEnglish: "Switch to English",
     },
     nav: {
-      product: "TrendRadar",
-      title: "信号台",
       feed: "动态资讯",
       dataSources: "信源管理",
-      settings: "设置",
-      crawlLogs: "抓取日志",
       controlCenter: "控制中心",
       contentAnalysis: "内容分析",
       signOut: "退出登录",
@@ -73,16 +69,6 @@ const messages = {
       platformWechat: "公众号",
       platformWebsite: "网站",
     },
-    settings: {
-      eyebrow: "设置",
-      title: "飞书 Webhook 配置",
-      description: "后端设置接口已经准备好，前端表单接入后即可完成配置。",
-    },
-    crawlLogs: {
-      eyebrow: "抓取日志",
-      title: "调度执行时间线",
-      description: "任务接线完成后，这里会展示爬虫执行历史。",
-    },
     contentAnalysis: {
       eyebrow: "内容分析",
       title: "内容分析",
@@ -119,12 +105,8 @@ const messages = {
       switchToEnglish: "Switch to English",
     },
     nav: {
-      product: "TrendRadar",
-      title: "Signal Desk",
       feed: "Latest Updates",
       dataSources: "Sources",
-      settings: "Settings",
-      crawlLogs: "Crawl Logs",
       controlCenter: "Control Center",
       contentAnalysis: "Content Analysis",
       signOut: "Sign out",
@@ -179,16 +161,6 @@ const messages = {
       platformWechat: "WeChat",
       platformWebsite: "Website",
     },
-    settings: {
-      eyebrow: "Settings",
-      title: "Feishu webhook setup",
-      description: "Settings APIs are initialized on the backend and waiting for frontend forms.",
-    },
-    crawlLogs: {
-      eyebrow: "Crawl Logs",
-      title: "Scheduler activity timeline",
-      description: "Crawler execution history will be shown here after job wiring is added.",
-    },
     contentAnalysis: {
       eyebrow: "Content Analysis",
       title: "Content Analysis",
@@ -225,12 +197,8 @@ type MessageKey =
   | "app.localeLabel"
   | "app.switchToChinese"
   | "app.switchToEnglish"
-  | "nav.product"
-  | "nav.title"
   | "nav.feed"
   | "nav.dataSources"
-  | "nav.settings"
-  | "nav.crawlLogs"
   | "nav.controlCenter"
   | "nav.contentAnalysis"
   | "nav.signOut"
@@ -280,12 +248,6 @@ type MessageKey =
   | "dataSources.platformYoutube"
   | "dataSources.platformWechat"
   | "dataSources.platformWebsite"
-  | "settings.eyebrow"
-  | "settings.title"
-  | "settings.description"
-  | "crawlLogs.eyebrow"
-  | "crawlLogs.title"
-  | "crawlLogs.description"
   | "contentAnalysis.eyebrow"
   | "contentAnalysis.title"
   | "contentAnalysis.description"

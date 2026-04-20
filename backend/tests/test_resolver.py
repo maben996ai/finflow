@@ -34,6 +34,8 @@ class TestResolverPatternMatching:
             "https://space.bilibili.com/123456",
             "https://space.bilibili.com/99999999",
             "https://b23.tv/abc123",
+            "https://space.bilibili.com/508452265/upload/video",
+            "https://space.bilibili.com/508452265/video",
         ],
     )
     async def test_bilibili_urls_resolve_to_bilibili_source_type(self, url):

@@ -62,6 +62,19 @@ def _mock_wbi_prereqs():
 
 class TestBilibiliResolveSource:
     @respx.mock
+    async def test_resolve_space_url_with_path_suffix_returns_source_info(self):
+        """space.bilibili.com/<uid>/upload/video 这类带路径后缀的 URL 也能正确解析。"""
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/acc/info").mock(
+            return_value=Response(200, json=BILIBILI_USER_INFO_OK)
+        )
+
+        source = await crawler.resolve_source("https://space.bilibili.com/123456/upload/video")
+
+        assert source.platform_id == "123456"
+        assert source.name == "测试UP主"
+
+    @respx.mock
     async def test_resolve_space_url_returns_source_info(self):
         _mock_wbi_prereqs()
         respx.get("https://api.bilibili.com/x/space/wbi/acc/info").mock(
