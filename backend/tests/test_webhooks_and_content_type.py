@@ -1,17 +1,16 @@
 """
 Tests for:
   - /api/webhooks/feishu  (multi-webhook CRUD)
-  - /api/creators  content_type filter & default
+  - /api/data-sources  content_type filter & default
   - FeishuNotifier.send_card
 """
+
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
-import httpx
 
-from app.models.models import ContentType, Platform
-from app.services.crawlers.base import CreatorInfo
+from app.models.models import SourceType
+from app.services.crawlers.base import SourceInfo
 from app.services.notifiers.feishu import FeishuNotifier
 from app.services.notifiers.feishu_client import FeishuAppClient
 
@@ -21,7 +20,7 @@ REGISTER_PAYLOAD = {
     "display_name": "Alice",
 }
 
-MOCK_CREATOR_INFO = CreatorInfo(
+MOCK_SOURCE_INFO = SourceInfo(
     platform_id="123456",
     name="测试UP主",
     profile_url="https://space.bilibili.com/123456",
@@ -33,13 +32,17 @@ WEBHOOK_URL = "https://open.feishu.cn/open-apis/bot/v2/hook/test-xxx"
 
 # ── helpers ───────────────────────────────────────────────────────────────────
 
-async def _make_creator(client, auth_headers, content_type: str = "video"):
-    with patch(
-        "app.api.creators.resolve_creator",
-        new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+
+async def _make_data_source(client, auth_headers, content_type: str = "video"):
+    with (
+        patch(
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
+        ),
+        patch("app.api.data_sources._run_initial_crawl", new=AsyncMock()),
     ):
         resp = await client.post(
-            "/api/creators",
+            "/api/data-sources",
             json={"url": "https://space.bilibili.com/123456", "content_type": content_type},
             headers=auth_headers,
         )
@@ -47,6 +50,7 @@ async def _make_creator(client, auth_headers, content_type: str = "video"):
 
 
 # ── FeishuWebhooks API ────────────────────────────────────────────────────────
+
 
 class TestFeishuWebhooksAPI:
     async def test_list_returns_empty_for_new_user(self, client, auth_headers):
@@ -192,66 +196,75 @@ class TestFeishuWebhooksAPI:
         assert resp.json() == []
 
 
-# ── Creators content_type ─────────────────────────────────────────────────────
+# ── DataSources content_type ──────────────────────────────────────────────────
 
-class TestCreatorsContentType:
+
+class TestDataSourcesContentType:
     async def test_create_defaults_to_video(self, client, auth_headers):
-        resp = await _make_creator(client, auth_headers)
+        resp = await _make_data_source(client, auth_headers)
         assert resp.status_code == 201
         assert resp.json()["content_type"] == "video"
 
     async def test_create_with_explicit_content_type(self, client, auth_headers):
-        resp = await _make_creator(client, auth_headers, content_type="article")
+        resp = await _make_data_source(client, auth_headers, content_type="article")
         assert resp.status_code == 201
         assert resp.json()["content_type"] == "article"
 
     async def test_list_filter_by_content_type_video(self, client, auth_headers):
-        await _make_creator(client, auth_headers, content_type="video")
-        resp = await client.get("/api/creators?content_type=video", headers=auth_headers)
+        await _make_data_source(client, auth_headers, content_type="video")
+        resp = await client.get("/api/data-sources?content_type=video", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) == 1
         assert resp.json()[0]["content_type"] == "video"
 
     async def test_list_filter_excludes_other_types(self, client, auth_headers):
-        await _make_creator(client, auth_headers, content_type="video")
-        resp = await client.get("/api/creators?content_type=article", headers=auth_headers)
+        await _make_data_source(client, auth_headers, content_type="video")
+        resp = await client.get("/api/data-sources?content_type=article", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
 
     async def test_list_without_filter_returns_all(self, client, auth_headers):
-        with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(side_effect=[
-                (Platform.BILIBILI, MOCK_CREATOR_INFO),
-                (Platform.BILIBILI, CreatorInfo(
-                    platform_id="999999",
-                    name="另一个UP主",
-                    profile_url="https://space.bilibili.com/999999",
-                    avatar_url=None,
-                )),
-            ]),
+        with (
+            patch(
+                "app.api.data_sources.resolve_source",
+                new=AsyncMock(
+                    side_effect=[
+                        (SourceType.BILIBILI, MOCK_SOURCE_INFO),
+                        (
+                            SourceType.BILIBILI,
+                            SourceInfo(
+                                platform_id="999999",
+                                name="另一个UP主",
+                                profile_url="https://space.bilibili.com/999999",
+                                avatar_url=None,
+                            ),
+                        ),
+                    ]
+                ),
+            ),
+            patch("app.api.data_sources._run_initial_crawl", new=AsyncMock()),
         ):
             await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456", "content_type": "video"},
                 headers=auth_headers,
             )
             await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/999999", "content_type": "article"},
                 headers=auth_headers,
             )
 
-        resp = await client.get("/api/creators", headers=auth_headers)
+        resp = await client.get("/api/data-sources", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) == 2
 
     async def test_patch_content_type(self, client, auth_headers):
-        create_resp = await _make_creator(client, auth_headers, content_type="video")
-        creator_id = create_resp.json()["id"]
+        create_resp = await _make_data_source(client, auth_headers, content_type="video")
+        source_id = create_resp.json()["id"]
 
         resp = await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"content_type": "article"},
             headers=auth_headers,
         )
@@ -260,20 +273,21 @@ class TestCreatorsContentType:
 
     async def test_patch_content_type_then_filtered_out(self, client, auth_headers):
         """After changing type from video to article, video filter returns empty."""
-        create_resp = await _make_creator(client, auth_headers, content_type="video")
-        creator_id = create_resp.json()["id"]
+        create_resp = await _make_data_source(client, auth_headers, content_type="video")
+        source_id = create_resp.json()["id"]
 
         await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"content_type": "article"},
             headers=auth_headers,
         )
 
-        resp = await client.get("/api/creators?content_type=video", headers=auth_headers)
+        resp = await client.get("/api/data-sources?content_type=video", headers=auth_headers)
         assert resp.json() == []
 
 
 # ── FeishuNotifier ────────────────────────────────────────────────────────────
+
 
 class TestFeishuNotifier:
     async def test_send_card_posts_to_webhook(self):
@@ -325,7 +339,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -347,7 +363,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -369,7 +387,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             video_url = "https://www.bilibili.com/video/BV123"
@@ -395,7 +415,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -423,13 +445,17 @@ class TestFeishuNotifier:
             return "img_v3_0001"
 
         with (
-            patch.object(app_client, "upload_image_from_url", new=AsyncMock(side_effect=fake_upload)),
+            patch.object(
+                app_client, "upload_image_from_url", new=AsyncMock(side_effect=fake_upload)
+            ),
             patch("app.services.notifiers.feishu.httpx.AsyncClient") as mock_client_cls,
         ):
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -458,7 +484,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -481,7 +509,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -513,7 +543,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -544,7 +576,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(
@@ -582,7 +616,9 @@ class TestFeishuNotifier:
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=False)
-            mock_client.post = AsyncMock(side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {})))
+            mock_client.post = AsyncMock(
+                side_effect=lambda url, **kw: sent_payload.update(kw.get("json", {}))
+            )
             mock_client_cls.return_value = mock_client
 
             await notifier.send_card(

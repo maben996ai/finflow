@@ -5,16 +5,16 @@ from urllib.parse import ParseResult, parse_qs, urlparse
 import httpx
 
 from app.core.config import get_settings
-from app.models.models import Platform
-from app.services.crawlers.base import BaseCrawler, CrawledVideo, CreatorInfo
+from app.models.models import SourceType
+from app.services.crawlers.base import BaseCrawler, CrawledVideo, SourceInfo
 
 settings = get_settings()
 
 
 class YouTubeCrawler(BaseCrawler):
-    platform = Platform.YOUTUBE
+    source_type = SourceType.YOUTUBE
 
-    async def resolve_creator(self, url: str) -> CreatorInfo:
+    async def resolve_source(self, url: str) -> SourceInfo:
         parsed = urlparse(url)
         if not settings.youtube_api_key:
             raise ValueError("YOUTUBE_API_KEY is required to resolve YouTube creators")
@@ -39,7 +39,7 @@ class YouTubeCrawler(BaseCrawler):
             raise ValueError("Failed to resolve YouTube creator")
         snippet = items[0].get("snippet") or {}
 
-        return CreatorInfo(
+        return SourceInfo(
             platform_id=channel_id,
             name=snippet.get("title") or channel_id,
             profile_url=f"https://www.youtube.com/channel/{channel_id}",
@@ -47,12 +47,12 @@ class YouTubeCrawler(BaseCrawler):
             raw_data=items[0],
         )
 
-    async def fetch_latest_videos(self, creator_id: str, limit: int = 20) -> list[CrawledVideo]:
+    async def fetch_latest_videos(self, external_id: str, limit: int = 20) -> list[CrawledVideo]:
         if not settings.youtube_api_key:
             return []
 
         # uploads playlist ID = replace leading "UC" with "UU"
-        uploads_playlist_id = "UU" + creator_id[2:]
+        uploads_playlist_id = "UU" + external_id[2:]
         async with httpx.AsyncClient(timeout=20) as client:
             playlist_response = await client.get(
                 "https://www.googleapis.com/youtube/v3/playlistItems",

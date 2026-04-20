@@ -4,18 +4,18 @@
       <div class="author-hero-info">
         <RouterLink to="/" class="back-link">{{ t("feed.backToFeed") }}</RouterLink>
         <div class="author-hero-identity">
-          <img v-if="authorAvatar" :src="authorAvatar" class="creator-avatar-lg" :alt="authorName" referrerpolicy="no-referrer" />
+          <img v-if="sourceAvatar" :src="sourceAvatar" class="creator-avatar-lg" :alt="sourceName" referrerpolicy="no-referrer" />
           <div v-else class="creator-avatar-lg creator-avatar-placeholder" />
           <div>
-            <p class="eyebrow">{{ authorPlatform }}</p>
-            <h2>{{ authorName }}</h2>
+            <p class="eyebrow">{{ sourceType }}</p>
+            <h2>{{ sourceName }}</h2>
           </div>
         </div>
       </div>
     </div>
 
     <p v-if="feedStore.loading" class="muted feed-state">{{ t("feed.loading") }}</p>
-    <p v-else-if="!authorVideos.length" class="muted feed-state">{{ t("feed.empty") }}</p>
+    <p v-else-if="!sourceVideos.length" class="muted feed-state">{{ t("feed.empty") }}</p>
 
     <template v-else>
       <div class="video-grid-sm">
@@ -30,7 +30,7 @@
           <div class="video-thumb-sm">
             <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
             <div v-else class="video-thumb-placeholder" />
-            <span class="platform-badge" :class="video.platform">{{ video.platform }}</span>
+            <span class="platform-badge" :class="video.source_type">{{ video.source_type }}</span>
           </div>
           <div class="video-info-sm">
             <p class="video-title-sm">{{ video.title }}</p>
@@ -67,22 +67,22 @@ const feedStore = useFeedStore();
 const PAGE_SIZE = 15;
 const page = ref(1);
 
-const creatorId = computed(() => route.params.creatorId as string);
+const sourceId = computed(() => route.params.sourceId as string);
 
-const authorVideos = computed(() =>
+const sourceVideos = computed(() =>
   feedStore.videos
-    .filter((v) => v.creator_id === creatorId.value)
+    .filter((v) => v.data_source_id === sourceId.value)
     .sort((a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime())
 );
 
-const authorName = computed(() => authorVideos.value[0]?.creator_name ?? "");
-const authorAvatar = computed(() => authorVideos.value[0]?.creator_avatar_url ?? null);
-const authorPlatform = computed(() => authorVideos.value[0]?.platform ?? "");
+const sourceName = computed(() => sourceVideos.value[0]?.data_source_name ?? "");
+const sourceAvatar = computed(() => sourceVideos.value[0]?.data_source_avatar_url ?? null);
+const sourceType = computed(() => sourceVideos.value[0]?.source_type ?? "");
 
-const totalPages = computed(() => Math.max(1, Math.ceil(authorVideos.value.length / PAGE_SIZE)));
+const totalPages = computed(() => Math.max(1, Math.ceil(sourceVideos.value.length / PAGE_SIZE)));
 const pagedVideos = computed(() => {
   const start = (page.value - 1) * PAGE_SIZE;
-  return authorVideos.value.slice(start, start + PAGE_SIZE);
+  return sourceVideos.value.slice(start, start + PAGE_SIZE);
 });
 
 onMounted(() => {

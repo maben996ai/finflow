@@ -20,9 +20,9 @@ async def list_crawl_logs(
 ) -> list[CrawlLog]:
     stmt = (
         select(CrawlLog)
-        .options(selectinload(CrawlLog.creator))
-        .join(CrawlLog.creator)
-        .where(CrawlLog.creator.has(user_id=current_user.id))
+        .options(selectinload(CrawlLog.data_source))
+        .join(CrawlLog.data_source)
+        .where(CrawlLog.data_source.has(user_id=current_user.id))
         .order_by(CrawlLog.created_at.desc())
     )
     if status is not None:
@@ -31,4 +31,3 @@ async def list_crawl_logs(
 
     result = await db.scalars(stmt)
     return list(result)
-

@@ -6,7 +6,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import func, select
 
 from app.core.database import AsyncSessionLocal
-from app.models.models import CrawlLogStatus, Creator, CrawlLog, FeishuWebhook, Video
+from app.models.models import CrawlLogStatus, DataSource, CrawlLog, FeishuWebhook, Video
 from app.services.crawlers.registry import crawler_registry
 from app.services.notifiers.feishu import FeishuNotifier
 
@@ -23,7 +23,9 @@ class SchedulerService:
     async def start(self) -> None:
         if self._started:
             return
-        self.scheduler.add_job(crawl_all_creators, "interval", minutes=30, id="crawl_all_creators", replace_existing=True)
+        self.scheduler.add_job(
+            crawl_all_sources, "interval", minutes=30, id="crawl_all_sources", replace_existing=True
+        )
         self.scheduler.start()
         self._started = True
 
@@ -41,32 +43,41 @@ INCREMENTAL_CRAWL_LIMIT = 2
 async def _get_webhook_urls(user_id: str) -> list[str]:
     async with AsyncSessionLocal() as db:
         rows = await db.scalars(
-            select(FeishuWebhook).where(FeishuWebhook.user_id == user_id, FeishuWebhook.enabled.is_(True))
+            select(FeishuWebhook).where(
+                FeishuWebhook.user_id == user_id, FeishuWebhook.enabled.is_(True)
+            )
         )
         return [r.webhook_url for r in rows]
 
 
-async def crawl_creator(creator: Creator) -> int:
-    crawler = crawler_registry.get(creator.platform)
+async def crawl_source(source: DataSource) -> int:
+    crawler = crawler_registry.get(source.source_type)
 
     async with AsyncSessionLocal() as db:
         existing_count = await db.scalar(
-            select(func.count()).select_from(Video).where(Video.creator_id == creator.id)
+            select(func.count()).select_from(Video).where(Video.data_source_id == source.id)
         )
 
     is_first_crawl = (existing_count or 0) == 0
     limit = FIRST_CRAWL_LIMIT if is_first_crawl else INCREMENTAL_CRAWL_LIMIT
 
-    videos = await crawler.fetch_latest_videos(creator.platform_creator_id, limit=limit)
+    videos = await crawler.fetch_latest_videos(source.external_id, limit=limit)
 
     inserted_count = 0
     async with AsyncSessionLocal() as db:
         if not videos:
-            db.add(CrawlLog(creator_id=creator.id, status=CrawlLogStatus.SUCCESS, message=None, videos_found=0))
+            db.add(
+                CrawlLog(
+                    data_source_id=source.id,
+                    status=CrawlLogStatus.SUCCESS,
+                    message=None,
+                    videos_found=0,
+                )
+            )
             if is_first_crawl:
-                creator_row = await db.get(Creator, creator.id)
-                if creator_row is not None and creator_row.initialized_at is None:
-                    creator_row.initialized_at = datetime.now(UTC)
+                source_row = await db.get(DataSource, source.id)
+                if source_row is not None and source_row.initialized_at is None:
+                    source_row.initialized_at = datetime.now(UTC)
             await db.commit()
             return 0
 
@@ -74,7 +85,7 @@ async def crawl_creator(creator: Creator) -> int:
         existing_ids = set(
             await db.scalars(
                 select(Video.platform_video_id).where(
-                    Video.creator_id == creator.id,
+                    Video.data_source_id == source.id,
                     Video.platform_video_id.in_(fetched_ids),
                 )
             )
@@ -85,7 +96,7 @@ async def crawl_creator(creator: Creator) -> int:
             if video.platform_video_id in existing_ids:
                 continue
             new_video = Video(
-                creator_id=creator.id,
+                data_source_id=source.id,
                 platform_video_id=video.platform_video_id,
                 title=video.title,
                 thumbnail_url=video.thumbnail_url,
@@ -104,14 +115,14 @@ async def crawl_creator(creator: Creator) -> int:
                 v.notified_at = now
 
         if is_first_crawl:
-            creator_row = await db.get(Creator, creator.id)
-            if creator_row is not None and creator_row.initialized_at is None:
-                creator_row.initialized_at = datetime.now(UTC)
+            source_row = await db.get(DataSource, source.id)
+            if source_row is not None and source_row.initialized_at is None:
+                source_row.initialized_at = datetime.now(UTC)
 
         inserted_count = len(new_videos)
         db.add(
             CrawlLog(
-                creator_id=creator.id,
+                data_source_id=source.id,
                 status=CrawlLogStatus.SUCCESS,
                 message=None,
                 videos_found=inserted_count,
@@ -120,10 +131,10 @@ async def crawl_creator(creator: Creator) -> int:
         await db.commit()
 
     # 通知阶段：扫描 notified_at IS NULL 的待发视频，任一失败则保持 None 供下次重试
-    if not creator.notifications_enabled:
+    if not source.notifications_enabled:
         return inserted_count
 
-    webhook_urls = await _get_webhook_urls(creator.user_id)
+    webhook_urls = await _get_webhook_urls(source.user_id)
     if not webhook_urls:
         return inserted_count
 
@@ -131,7 +142,7 @@ async def crawl_creator(creator: Creator) -> int:
         pending = list(
             await db.scalars(
                 select(Video)
-                .where(Video.creator_id == creator.id, Video.notified_at.is_(None))
+                .where(Video.data_source_id == source.id, Video.notified_at.is_(None))
                 .order_by(Video.published_at.desc())
             )
         )
@@ -143,8 +154,8 @@ async def crawl_creator(creator: Creator) -> int:
                 await _notifier.send_card(
                     webhook_url=webhook_url,
                     title=video.title,
-                    creator_name=creator.name,
-                    platform=creator.platform,
+                    creator_name=source.name,
+                    platform=source.source_type,
                     video_url=video.video_url,
                     thumbnail_url=video.thumbnail_url,
                     published_at=video.published_at,
@@ -168,25 +179,21 @@ async def crawl_creator(creator: Creator) -> int:
     return inserted_count
 
 
-async def crawl_all_creators() -> None:
+async def crawl_all_sources() -> None:
     async with AsyncSessionLocal() as db:
-        creators = list(await db.scalars(select(Creator)))
+        sources = list(await db.scalars(select(DataSource)))
 
-    results = await asyncio.gather(*[crawl_creator(c) for c in creators], return_exceptions=True)
+    results = await asyncio.gather(*[crawl_source(s) for s in sources], return_exceptions=True)
 
-    failed = [
-        (creators[i], exc)
-        for i, exc in enumerate(results)
-        if isinstance(exc, Exception)
-    ]
+    failed = [(sources[i], exc) for i, exc in enumerate(results) if isinstance(exc, Exception)]
     if not failed:
         return
 
     async with AsyncSessionLocal() as db:
-        for creator, exc in failed:
+        for source, exc in failed:
             db.add(
                 CrawlLog(
-                    creator_id=creator.id,
+                    data_source_id=source.id,
                     status=CrawlLogStatus.FAILED,
                     message=str(exc),
                     videos_found=0,

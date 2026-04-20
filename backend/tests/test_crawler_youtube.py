@@ -57,26 +57,21 @@ YOUTUBE_VIDEOS_DETAILS_OK = {
 }
 
 
-def _with_api_key(settings_override):
-    settings_override.youtube_api_key = "fake-api-key"
-    return settings_override
-
-
-class TestYouTubeResolveCreator:
+class TestYouTubeResolveSource:
     @respx.mock
-    async def test_resolve_channel_url_returns_creator_info(self):
+    async def test_resolve_channel_url_returns_source_info(self):
         respx.get("https://www.googleapis.com/youtube/v3/channels").mock(
             return_value=Response(200, json=YOUTUBE_CHANNEL_OK)
         )
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = "fake-key"
-            creator = await crawler.resolve_creator("https://www.youtube.com/channel/UCxxxxxx")
+            source = await crawler.resolve_source("https://www.youtube.com/channel/UCxxxxxx")
 
-        assert creator.platform_id == "UCxxxxxx"
-        assert creator.name == "Test Channel"
-        assert creator.avatar_url == "https://example.com/avatar.jpg"
-        assert creator.profile_url == "https://www.youtube.com/channel/UCxxxxxx"
+        assert source.platform_id == "UCxxxxxx"
+        assert source.name == "Test Channel"
+        assert source.avatar_url == "https://example.com/avatar.jpg"
+        assert source.profile_url == "https://www.youtube.com/channel/UCxxxxxx"
 
     @respx.mock
     async def test_resolve_handle_url_resolves_via_api(self):
@@ -89,15 +84,15 @@ class TestYouTubeResolveCreator:
 
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = "fake-key"
-            creator = await crawler.resolve_creator("https://www.youtube.com/@testchannel")
+            source = await crawler.resolve_source("https://www.youtube.com/@testchannel")
 
-        assert creator.platform_id == "UCxxxxxx"
+        assert source.platform_id == "UCxxxxxx"
 
     async def test_no_api_key_raises_value_error(self):
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = ""
             with pytest.raises(ValueError, match="YOUTUBE_API_KEY is required"):
-                await crawler.resolve_creator("https://www.youtube.com/channel/UCxxxxxx")
+                await crawler.resolve_source("https://www.youtube.com/channel/UCxxxxxx")
 
     @respx.mock
     async def test_channel_not_found_raises_value_error(self):
@@ -108,7 +103,7 @@ class TestYouTubeResolveCreator:
         with patch("app.services.crawlers.youtube.settings") as mock_settings:
             mock_settings.youtube_api_key = "fake-key"
             with pytest.raises(ValueError, match="Failed to resolve YouTube creator"):
-                await crawler.resolve_creator("https://www.youtube.com/channel/UCxxxxxx")
+                await crawler.resolve_source("https://www.youtube.com/channel/UCxxxxxx")
 
 
 class TestYouTubeFetchLatestVideos:

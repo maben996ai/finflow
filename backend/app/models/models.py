@@ -11,9 +11,13 @@ class Base(DeclarativeBase):
     pass
 
 
-class Platform(StrEnum):
+class SourceType(StrEnum):
     BILIBILI = "bilibili"
     YOUTUBE = "youtube"
+    WECHAT_ARTICLE = "wechat_article"
+    WEBSITE = "website"
+    RSS = "rss"
+    PDF = "pdf"
 
 
 class ContentType(StrEnum):
@@ -41,9 +45,15 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    creators: Mapped[list["Creator"]] = relationship(back_populates="user", cascade="all, delete-orphan")
-    settings: Mapped["UserSettings | None"] = relationship(back_populates="user", cascade="all, delete-orphan")
-    feishu_webhooks: Mapped[list["FeishuWebhook"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    data_sources: Mapped[list["DataSource"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    settings: Mapped["UserSettings | None"] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    feishu_webhooks: Mapped[list["FeishuWebhook"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserSettings(Base):
@@ -62,16 +72,18 @@ class UserSettings(Base):
     user: Mapped[User] = relationship(back_populates="settings")
 
 
-class Creator(Base):
-    __tablename__ = "creators"
+class DataSource(Base):
+    __tablename__ = "data_sources"
     __table_args__ = (
-        UniqueConstraint("user_id", "platform", "platform_creator_id", name="uq_creators_user_platform_creator"),
+        UniqueConstraint(
+            "user_id", "source_type", "external_id", name="uq_data_sources_user_type_external"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
-    platform: Mapped[Platform] = mapped_column(SqlEnum(Platform))
-    platform_creator_id: Mapped[str] = mapped_column(String(255), index=True)
+    source_type: Mapped[SourceType] = mapped_column(SqlEnum(SourceType, name="sourcetype"))
+    external_id: Mapped[str] = mapped_column(String(255), index=True)
     name: Mapped[str] = mapped_column(String(255))
     profile_url: Mapped[str] = mapped_column(Text())
     avatar_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
@@ -82,11 +94,10 @@ class Creator(Base):
         default=ContentType.VIDEO,
         server_default="video",
     )
+    source_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     starred: Mapped[bool] = mapped_column(Boolean, default=False)
     notifications_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    initialized_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    initialized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -94,31 +105,41 @@ class Creator(Base):
         onupdate=func.now(),
     )
 
-    user: Mapped[User] = relationship(back_populates="creators")
-    videos: Mapped[list["Video"]] = relationship(back_populates="creator", cascade="all, delete-orphan")
-    crawl_logs: Mapped[list["CrawlLog"]] = relationship(back_populates="creator", cascade="all, delete-orphan")
+    user: Mapped[User] = relationship(back_populates="data_sources")
+    videos: Mapped[list["Video"]] = relationship(
+        back_populates="data_source", cascade="all, delete-orphan"
+    )
+    crawl_logs: Mapped[list["CrawlLog"]] = relationship(
+        back_populates="data_source", cascade="all, delete-orphan"
+    )
 
 
 class Video(Base):
     __tablename__ = "videos"
     __table_args__ = (
-        UniqueConstraint("creator_id", "platform_video_id", name="uq_videos_creator_platform_video"),
+        UniqueConstraint(
+            "data_source_id", "platform_video_id", name="uq_videos_data_source_platform_video"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), index=True)
+    data_source_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("data_sources.id"), index=True
+    )
     platform_video_id: Mapped[str] = mapped_column(String(255), index=True)
     title: Mapped[str] = mapped_column(String(500))
     thumbnail_url: Mapped[str | None] = mapped_column(Text(), nullable=True)
     video_url: Mapped[str] = mapped_column(Text())
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
     raw_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     notified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    creator: Mapped[Creator] = relationship(back_populates="videos")
+    data_source: Mapped[DataSource] = relationship(back_populates="videos")
 
 
 class FeishuWebhook(Base):
@@ -138,10 +159,12 @@ class CrawlLog(Base):
     __tablename__ = "crawl_logs"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uuid_str)
-    creator_id: Mapped[str] = mapped_column(String(36), ForeignKey("creators.id"), index=True)
+    data_source_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("data_sources.id"), index=True
+    )
     status: Mapped[str] = mapped_column(String(50), default=CrawlLogStatus.SUCCESS)
     message: Mapped[str | None] = mapped_column(Text(), nullable=True)
     videos_found: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    creator: Mapped[Creator] = relationship(back_populates="crawl_logs")
+    data_source: Mapped[DataSource] = relationship(back_populates="crawl_logs")

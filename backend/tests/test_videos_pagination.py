@@ -2,35 +2,38 @@
 TDD: 视频流 API — 游标分页 + 状态更新
 Round 1: GET /api/videos 返回分页结构 {items, next_cursor, has_more}，支持 limit
 """
+
 from datetime import UTC, datetime, timedelta
 
-import pytest
 
-from app.models.models import Creator, Platform, Video
+from app.models.models import DataSource, SourceType, Video
 
 
 # ── seed helpers ──────────────────────────────────────────────────────────────
 
-async def _seed_creator(db, user_id: str, suffix: str = "1") -> Creator:
-    creator = Creator(
+
+async def _seed_data_source(db, user_id: str, suffix: str = "1") -> DataSource:
+    source = DataSource(
         user_id=user_id,
-        platform=Platform.BILIBILI,
-        platform_creator_id=f"uid_{suffix}",
+        source_type=SourceType.BILIBILI,
+        external_id=f"uid_{suffix}",
         name=f"Creator {suffix}",
         profile_url=f"https://space.bilibili.com/{suffix}",
     )
-    db.add(creator)
+    db.add(source)
     await db.flush()
-    return creator
+    return source
 
 
-async def _seed_videos(db, creator: Creator, n: int, base_dt: datetime | None = None) -> list[Video]:
+async def _seed_videos(
+    db, source: DataSource, n: int, base_dt: datetime | None = None
+) -> list[Video]:
     base = base_dt or datetime(2024, 1, 1, tzinfo=UTC)
     videos = []
     for i in range(n):
         v = Video(
-            creator_id=creator.id,
-            platform_video_id=f"BV{creator.platform_creator_id}_{i}",
+            data_source_id=source.id,
+            platform_video_id=f"BV{source.external_id}_{i}",
             title=f"Video {i}",
             video_url=f"https://www.bilibili.com/video/BV{i}",
             published_at=base + timedelta(hours=i),
@@ -43,12 +46,13 @@ async def _seed_videos(db, creator: Creator, n: int, base_dt: datetime | None = 
 
 # ── Round 1: 分页响应结构 ─────────────────────────────────────────────────────
 
+
 class TestVideosPaginatedResponse:
     async def test_response_has_items_key(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 3)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 3)
 
         resp = await client.get("/api/videos", headers=auth_headers)
         assert resp.status_code == 200
@@ -57,8 +61,8 @@ class TestVideosPaginatedResponse:
     async def test_response_has_next_cursor_key(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 3)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 3)
 
         resp = await client.get("/api/videos", headers=auth_headers)
         assert "next_cursor" in resp.json()
@@ -66,8 +70,8 @@ class TestVideosPaginatedResponse:
     async def test_response_has_has_more_key(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 3)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 3)
 
         resp = await client.get("/api/videos", headers=auth_headers)
         assert "has_more" in resp.json()
@@ -75,8 +79,8 @@ class TestVideosPaginatedResponse:
     async def test_items_contain_video_fields(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 1)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 1)
 
         resp = await client.get("/api/videos", headers=auth_headers)
         item = resp.json()["items"][0]
@@ -84,14 +88,16 @@ class TestVideosPaginatedResponse:
         assert "title" in item
         assert "video_url" in item
         assert "published_at" in item
-        assert "creator_name" in item
+        assert "data_source_name" in item
 
-    async def test_items_include_duration_seconds_when_present_in_raw_data(self, client, auth_headers, db):
+    async def test_items_include_duration_seconds_when_present_in_raw_data(
+        self, client, auth_headers, db
+    ):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
+        source = await _seed_data_source(db, user_id)
         video = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BV_duration",
             title="Video with duration",
             video_url="https://www.bilibili.com/video/BV_duration",
@@ -108,8 +114,8 @@ class TestVideosPaginatedResponse:
     async def test_limit_param_restricts_items(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 10)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 10)
 
         resp = await client.get("/api/videos?limit=3", headers=auth_headers)
         assert resp.status_code == 200
@@ -118,8 +124,8 @@ class TestVideosPaginatedResponse:
     async def test_has_more_true_when_more_exist(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 5)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 5)
 
         resp = await client.get("/api/videos?limit=3", headers=auth_headers)
         assert resp.json()["has_more"] is True
@@ -127,8 +133,8 @@ class TestVideosPaginatedResponse:
     async def test_has_more_false_when_all_returned(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 3)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 3)
 
         resp = await client.get("/api/videos?limit=10", headers=auth_headers)
         assert resp.json()["has_more"] is False
@@ -136,8 +142,8 @@ class TestVideosPaginatedResponse:
     async def test_next_cursor_is_none_when_no_more(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 2)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 2)
 
         resp = await client.get("/api/videos?limit=10", headers=auth_headers)
         assert resp.json()["next_cursor"] is None
@@ -145,8 +151,8 @@ class TestVideosPaginatedResponse:
     async def test_next_cursor_is_string_when_has_more(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 5)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 5)
 
         resp = await client.get("/api/videos?limit=3", headers=auth_headers)
         assert isinstance(resp.json()["next_cursor"], str)
@@ -165,12 +171,13 @@ class TestVideosPaginatedResponse:
 
 # ── Round 2: cursor 翻页 ──────────────────────────────────────────────────────
 
+
 class TestVideosCursorPagination:
     async def test_second_page_has_no_overlap_with_first(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 6)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 6)
 
         r1 = await client.get("/api/videos?limit=3", headers=auth_headers)
         cursor = r1.json()["next_cursor"]
@@ -183,8 +190,8 @@ class TestVideosCursorPagination:
     async def test_cursor_traversal_covers_all_videos(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 7)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 7)
 
         all_ids: set[str] = set()
         cursor = None
@@ -204,8 +211,8 @@ class TestVideosCursorPagination:
     async def test_second_page_items_older_than_first(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 6)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 6)
 
         r1 = await client.get("/api/videos?limit=3", headers=auth_headers)
         cursor = r1.json()["next_cursor"]
@@ -222,8 +229,8 @@ class TestVideosCursorPagination:
     async def test_cursor_page_has_correct_has_more(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 4)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 4)
 
         r1 = await client.get("/api/videos?limit=3", headers=auth_headers)
         cursor = r1.json()["next_cursor"]
@@ -235,8 +242,8 @@ class TestVideosCursorPagination:
     async def test_last_page_next_cursor_is_none(self, client, auth_headers, db):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
-        await _seed_videos(db, creator, 4)
+        source = await _seed_data_source(db, user_id)
+        await _seed_videos(db, source, 4)
 
         r1 = await client.get("/api/videos?limit=3", headers=auth_headers)
         cursor = r1.json()["next_cursor"]
@@ -244,12 +251,14 @@ class TestVideosCursorPagination:
 
         assert r2.json()["next_cursor"] is None
 
-    async def test_cursor_handles_same_published_at_without_duplicates(self, client, auth_headers, db):
+    async def test_cursor_handles_same_published_at_without_duplicates(
+        self, client, auth_headers, db
+    ):
         me = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me.json()["id"]
-        creator = await _seed_creator(db, user_id)
+        source = await _seed_data_source(db, user_id)
         same_dt = datetime(2024, 1, 1, tzinfo=UTC)
-        await _seed_videos(db, creator, 5, base_dt=same_dt)
+        await _seed_videos(db, source, 5, base_dt=same_dt)
 
         r1 = await client.get("/api/videos?limit=3", headers=auth_headers)
         cursor = r1.json()["next_cursor"]

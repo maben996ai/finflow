@@ -7,7 +7,7 @@
       </div>
       <nav class="nav">
         <RouterLink to="/">{{ t("nav.feed") }}</RouterLink>
-        <RouterLink to="/creators">{{ t("nav.creators") }}</RouterLink>
+        <RouterLink to="/sources">{{ t("nav.dataSources") }}</RouterLink>
         <RouterLink to="/content-analysis">{{ t("nav.contentAnalysis") }}</RouterLink>
         <RouterLink to="/control-center">{{ t("nav.controlCenter") }}</RouterLink>
       </nav>

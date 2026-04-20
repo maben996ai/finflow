@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from app.models.models import Platform
+from app.models.models import SourceType
 
 
 @dataclass
-class CreatorInfo:
+class SourceInfo:
     platform_id: str
     name: str
     profile_url: str
@@ -25,13 +25,12 @@ class CrawledVideo:
 
 
 class BaseCrawler(ABC):
-    platform: Platform
+    source_type: SourceType
 
     @abstractmethod
-    async def resolve_creator(self, url: str) -> CreatorInfo:
+    async def resolve_source(self, url: str) -> SourceInfo:
         raise NotImplementedError
 
     @abstractmethod
-    async def fetch_latest_videos(self, creator_id: str, limit: int = 20) -> list[CrawledVideo]:
+    async def fetch_latest_videos(self, external_id: str, limit: int = 20) -> list[CrawledVideo]:
         raise NotImplementedError
-

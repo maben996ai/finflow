@@ -37,15 +37,15 @@
       <template v-if="sortMode === 'author'">
         <div class="panel author-groups-panel">
           <div class="author-groups-scroll">
-            <div v-for="group in pagedAuthorGroups" :key="group.creatorId" class="author-group">
+            <div v-for="group in pagedAuthorGroups" :key="group.sourceId" class="author-group">
               <div class="author-group-header">
-                <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.creatorName" referrerpolicy="no-referrer" />
+                <img v-if="group.avatarUrl" :src="group.avatarUrl" class="creator-avatar" :alt="group.sourceName" referrerpolicy="no-referrer" />
                 <div v-else class="creator-avatar creator-avatar-placeholder" />
                 <div class="author-group-title-row">
-                  <RouterLink :to="`/author/${group.creatorId}`" class="author-group-name">{{ group.creatorName }}</RouterLink>
-                  <span class="platform-badge author-inline-platform" :class="group.platform">{{ group.platform }}</span>
+                  <RouterLink :to="`/source/${group.sourceId}`" class="author-group-name">{{ group.sourceName }}</RouterLink>
+                  <span class="platform-badge author-inline-platform" :class="group.sourceType">{{ group.sourceType }}</span>
                 </div>
-                <RouterLink :to="`/author/${group.creatorId}`" class="author-view-all muted">
+                <RouterLink :to="`/source/${group.sourceId}`" class="author-view-all muted">
                   {{ t("feed.viewAll") }} {{ group.videos.length }} →
                 </RouterLink>
               </div>
@@ -96,12 +96,12 @@
             <div class="video-thumb-sm">
               <img v-if="video.thumbnail_url" :src="video.thumbnail_url" :alt="video.title" loading="lazy" referrerpolicy="no-referrer" />
               <div v-else class="video-thumb-placeholder" />
-              <span class="platform-badge" :class="video.platform">{{ video.platform }}</span>
+              <span class="platform-badge" :class="video.source_type">{{ video.source_type }}</span>
             </div>
             <div class="video-info-sm">
               <p class="video-title-sm">{{ video.title }}</p>
               <div class="video-meta-stack-sm">
-                <span class="muted video-meta-line-sm">{{ video.creator_name }}</span>
+                <span class="muted video-meta-line-sm">{{ video.data_source_name }}</span>
                 <div class="video-meta-sm">
                   <span class="muted">{{ formatPublishedAt(video.published_at) }}</span>
                   <span class="muted">{{ formatDuration(video.duration_seconds) }}</span>
@@ -153,26 +153,26 @@ const pagedVideos = computed(() => {
 });
 
 interface AuthorGroup {
-  creatorId: string;
-  creatorName: string;
+  sourceId: string;
+  sourceName: string;
   avatarUrl: string | null | undefined;
-  platform: "bilibili" | "youtube";
+  sourceType: string;
   videos: Video[];
 }
 
 const authorGroups = computed((): AuthorGroup[] => {
   const map = new Map<string, AuthorGroup>();
   for (const video of feedStore.videos) {
-    if (!map.has(video.creator_id)) {
-      map.set(video.creator_id, {
-        creatorId: video.creator_id,
-        creatorName: video.creator_name,
-        avatarUrl: video.creator_avatar_url,
-        platform: video.platform,
+    if (!map.has(video.data_source_id)) {
+      map.set(video.data_source_id, {
+        sourceId: video.data_source_id,
+        sourceName: video.data_source_name,
+        avatarUrl: video.data_source_avatar_url,
+        sourceType: video.source_type,
         videos: [],
       });
     }
-    map.get(video.creator_id)!.videos.push(video);
+    map.get(video.data_source_id)!.videos.push(video);
   }
   for (const group of map.values()) {
     group.videos.sort(

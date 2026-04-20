@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.models.models import CrawlLog, CrawlLogStatus, Creator, Platform, Video
-from app.services.crawlers.base import CreatorInfo
+from app.models.models import CrawlLog, CrawlLogStatus, DataSource, SourceType, Video
+from app.services.crawlers.base import SourceInfo
 
 
 # ── helpers ──────────────────────────────────────────────────────────────────
@@ -15,7 +15,7 @@ REGISTER_PAYLOAD = {
     "display_name": "Alice",
 }
 
-MOCK_CREATOR_INFO = CreatorInfo(
+MOCK_SOURCE_INFO = SourceInfo(
     platform_id="123456",
     name="测试UP主",
     profile_url="https://space.bilibili.com/123456",
@@ -24,6 +24,7 @@ MOCK_CREATOR_INFO = CreatorInfo(
 
 
 # ── auth ─────────────────────────────────────────────────────────────────────
+
 
 class TestAuthRegister:
     async def test_register_returns_201_and_user_fields(self, client):
@@ -90,109 +91,110 @@ class TestAuthMe:
         assert resp.status_code == 401
 
 
-# ── creators ─────────────────────────────────────────────────────────────────
+# ── data sources ──────────────────────────────────────────────────────────────
 
-class TestCreatorsAPI:
+
+class TestDataSourcesAPI:
     @pytest.fixture(autouse=True)
     def _mock_background_crawl(self):
-        """避免每个创建 creator 的测试真的触发后台抓取。"""
-        with patch("app.api.creators._run_initial_crawl", new=AsyncMock(return_value=None)):
+        """避免每个创建 data source 的测试真的触发后台抓取。"""
+        with patch("app.api.data_sources._run_initial_crawl", new=AsyncMock(return_value=None)):
             yield
 
-    async def test_list_creators_empty_for_new_user(self, client, auth_headers):
-        resp = await client.get("/api/creators", headers=auth_headers)
+    async def test_list_data_sources_empty_for_new_user(self, client, auth_headers):
+        resp = await client.get("/api/data-sources", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
 
-    async def test_create_creator_returns_201(self, client, auth_headers):
+    async def test_create_data_source_returns_201(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
         assert resp.status_code == 201
         body = resp.json()
         assert body["name"] == "测试UP主"
-        assert body["platform"] == "bilibili"
-        assert body["platform_creator_id"] == "123456"
+        assert body["source_type"] == "bilibili"
+        assert body["external_id"] == "123456"
 
-    async def test_create_duplicate_creator_returns_409(self, client, auth_headers):
+    async def test_create_duplicate_data_source_returns_409(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
         assert resp.status_code == 409
 
-    async def test_create_creator_unsupported_url_returns_400(self, client, auth_headers):
+    async def test_create_data_source_unsupported_url_returns_400(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(side_effect=ValueError("Unsupported creator URL")),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(side_effect=ValueError("Unsupported source URL")),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://twitter.com/someone"},
                 headers=auth_headers,
             )
         assert resp.status_code == 400
 
-    async def test_delete_creator_returns_204(self, client, auth_headers, db):
+    async def test_delete_data_source_returns_204(self, client, auth_headers, db):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
-        resp = await client.delete(f"/api/creators/{creator_id}", headers=auth_headers)
+        source_id = create_resp.json()["id"]
+        resp = await client.delete(f"/api/data-sources/{source_id}", headers=auth_headers)
         assert resp.status_code == 204
 
-    async def test_delete_nonexistent_creator_returns_404(self, client, auth_headers):
-        resp = await client.delete("/api/creators/nonexistent-id", headers=auth_headers)
+    async def test_delete_nonexistent_data_source_returns_404(self, client, auth_headers):
+        resp = await client.delete("/api/data-sources/nonexistent-id", headers=auth_headers)
         assert resp.status_code == 404
 
-    async def test_create_creator_returns_initialized_at_null(self, client, auth_headers):
+    async def test_create_data_source_returns_initialized_at_null(self, client, auth_headers):
         """新建信源响应里 initialized_at 为 null，表示正在初始化。"""
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
         assert resp.status_code == 201
         assert resp.json()["initialized_at"] is None
 
-    async def test_create_creator_schedules_initialization_task(self, client, auth_headers):
-        """POST /api/creators 应在后台调度初始化流程，不阻塞响应。"""
+    async def test_create_data_source_schedules_initialization_task(self, client, auth_headers):
+        """POST /api/data-sources 应在后台调度初始化流程，不阻塞响应。"""
         mock_initial_crawl = AsyncMock(return_value=None)
         with (
             patch(
-                "app.api.creators.resolve_creator",
-                new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+                "app.api.data_sources.resolve_source",
+                new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
             ),
-            patch("app.api.creators._run_initial_crawl", new=mock_initial_crawl),
+            patch("app.api.data_sources._run_initial_crawl", new=mock_initial_crawl),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
@@ -202,186 +204,187 @@ class TestCreatorsAPI:
     async def test_manual_crawl_endpoint_removed(self, client, auth_headers):
         """不再对外暴露手动触发抓取端点。"""
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
-        resp = await client.post(f"/api/creators/{creator_id}/crawl", headers=auth_headers)
+        source_id = create_resp.json()["id"]
+        resp = await client.post(f"/api/data-sources/{source_id}/crawl", headers=auth_headers)
         assert resp.status_code in (404, 405)
 
-    async def test_patch_creator_note(self, client, auth_headers):
+    async def test_patch_data_source_note(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
+        source_id = create_resp.json()["id"]
 
         resp = await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"note": "重点关注"},
             headers=auth_headers,
         )
         assert resp.status_code == 200
         assert resp.json()["note"] == "重点关注"
 
-    async def test_patch_creator_note_nonexistent_returns_404(self, client, auth_headers):
+    async def test_patch_data_source_note_nonexistent_returns_404(self, client, auth_headers):
         resp = await client.patch(
-            "/api/creators/nonexistent-id",
+            "/api/data-sources/nonexistent-id",
             json={"note": "test"},
             headers=auth_headers,
         )
         assert resp.status_code == 404
 
-    async def test_patch_creator_note_clears_to_none(self, client, auth_headers):
+    async def test_patch_data_source_note_clears_to_none(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456", "note": "原备注"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
+        source_id = create_resp.json()["id"]
 
         resp = await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"note": None},
             headers=auth_headers,
         )
         assert resp.status_code == 200
         assert resp.json()["note"] is None
 
-    async def test_create_creator_default_category_is_none(self, client, auth_headers):
+    async def test_create_data_source_default_category_is_none(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
         assert resp.status_code == 201
         assert resp.json()["category"] is None
 
-    async def test_patch_creator_category(self, client, auth_headers):
+    async def test_patch_data_source_category(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
+        source_id = create_resp.json()["id"]
 
         resp = await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"category": "宏观经济"},
             headers=auth_headers,
         )
         assert resp.status_code == 200
         assert resp.json()["category"] == "宏观经济"
 
-    async def test_create_creator_default_starred_is_false(self, client, auth_headers):
+    async def test_create_data_source_default_starred_is_false(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
         assert resp.status_code == 201
         assert resp.json()["starred"] is False
 
-    async def test_patch_creator_starred(self, client, auth_headers):
+    async def test_patch_data_source_starred(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
+        source_id = create_resp.json()["id"]
 
         resp = await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"starred": True},
             headers=auth_headers,
         )
         assert resp.status_code == 200
         assert resp.json()["starred"] is True
 
-    async def test_list_creators_filter_starred(self, client, auth_headers):
+    async def test_list_data_sources_filter_starred(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             create_resp = await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
-        creator_id = create_resp.json()["id"]
+        source_id = create_resp.json()["id"]
 
         await client.patch(
-            f"/api/creators/{creator_id}",
+            f"/api/data-sources/{source_id}",
             json={"starred": True},
             headers=auth_headers,
         )
 
-        resp = await client.get("/api/creators?starred=true", headers=auth_headers)
+        resp = await client.get("/api/data-sources?starred=true", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()) == 1
         assert resp.json()[0]["starred"] is True
 
-    async def test_list_creators_filter_starred_excludes_unstarred(self, client, auth_headers):
+    async def test_list_data_sources_filter_starred_excludes_unstarred(self, client, auth_headers):
         with patch(
-            "app.api.creators.resolve_creator",
-            new=AsyncMock(return_value=(Platform.BILIBILI, MOCK_CREATOR_INFO)),
+            "app.api.data_sources.resolve_source",
+            new=AsyncMock(return_value=(SourceType.BILIBILI, MOCK_SOURCE_INFO)),
         ):
             await client.post(
-                "/api/creators",
+                "/api/data-sources",
                 json={"url": "https://space.bilibili.com/123456"},
                 headers=auth_headers,
             )
 
-        resp = await client.get("/api/creators?starred=true", headers=auth_headers)
+        resp = await client.get("/api/data-sources?starred=true", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
 
 
 # ── videos ───────────────────────────────────────────────────────────────────
 
+
 class TestVideosAPI:
     async def _seed_video(self, db, user_id: str) -> Video:
-        creator = Creator(
+        source = DataSource(
             user_id=user_id,
-            platform=Platform.BILIBILI,
-            platform_creator_id="111",
-            name="Seeded Creator",
+            source_type=SourceType.BILIBILI,
+            external_id="111",
+            name="Seeded Source",
             profile_url="https://space.bilibili.com/111",
         )
-        db.add(creator)
+        db.add(source)
         await db.flush()
         video = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BVtest",
             title="Test Video",
             video_url="https://www.bilibili.com/video/BVtest",
@@ -401,12 +404,12 @@ class TestVideosAPI:
         assert len(resp.json()["items"]) == 1
         assert resp.json()["items"][0]["title"] == "Test Video"
 
-    async def test_list_videos_filter_by_platform(self, client, auth_headers, db):
+    async def test_list_videos_filter_by_source_type(self, client, auth_headers, db):
         me_resp = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me_resp.json()["id"]
         await self._seed_video(db, user_id)
 
-        resp = await client.get("/api/videos?platform=youtube", headers=auth_headers)
+        resp = await client.get("/api/videos?source_type=youtube", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json()["items"] == []
 
@@ -416,6 +419,7 @@ class TestVideosAPI:
 
 
 # ── settings ─────────────────────────────────────────────────────────────────
+
 
 class TestSettingsAPI:
     async def test_get_feishu_settings_returns_defaults(self, client, auth_headers):
@@ -430,7 +434,9 @@ class TestSettingsAPI:
             headers=auth_headers,
         )
         assert resp.status_code == 200
-        assert resp.json()["feishu_webhook_url"] == "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+        assert (
+            resp.json()["feishu_webhook_url"] == "https://open.feishu.cn/open-apis/bot/v2/hook/xxx"
+        )
 
     async def test_update_then_get_reflects_change(self, client, auth_headers):
         await client.put(
@@ -444,20 +450,21 @@ class TestSettingsAPI:
 
 # ── crawl logs ────────────────────────────────────────────────────────────────
 
+
 class TestCrawlLogsAPI:
     async def _seed_log(
-        self, db, user_id: str, status: CrawlLogStatus, platform_creator_id: str = "999"
+        self, db, user_id: str, status: CrawlLogStatus, external_id: str = "999"
     ) -> CrawlLog:
-        creator = Creator(
+        source = DataSource(
             user_id=user_id,
-            platform=Platform.BILIBILI,
-            platform_creator_id=platform_creator_id,
-            name="Log Creator",
-            profile_url=f"https://space.bilibili.com/{platform_creator_id}",
+            source_type=SourceType.BILIBILI,
+            external_id=external_id,
+            name="Log Source",
+            profile_url=f"https://space.bilibili.com/{external_id}",
         )
-        db.add(creator)
+        db.add(source)
         await db.flush()
-        log = CrawlLog(creator_id=creator.id, status=status, videos_found=1)
+        log = CrawlLog(data_source_id=source.id, status=status, videos_found=1)
         db.add(log)
         await db.commit()
         return log
@@ -474,8 +481,8 @@ class TestCrawlLogsAPI:
     async def test_filter_by_status(self, client, auth_headers, db):
         me_resp = await client.get("/api/auth/me", headers=auth_headers)
         user_id = me_resp.json()["id"]
-        await self._seed_log(db, user_id, CrawlLogStatus.SUCCESS, platform_creator_id="998")
-        await self._seed_log(db, user_id, CrawlLogStatus.FAILED, platform_creator_id="999")
+        await self._seed_log(db, user_id, CrawlLogStatus.SUCCESS, external_id="998")
+        await self._seed_log(db, user_id, CrawlLogStatus.FAILED, external_id="999")
 
         resp = await client.get("/api/crawl-logs?status=failed", headers=auth_headers)
         assert resp.status_code == 200

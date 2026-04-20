@@ -60,19 +60,20 @@ def _mock_wbi_prereqs():
     )
 
 
-class TestBilibiliResolveCreator:
+class TestBilibiliResolveSource:
     @respx.mock
-    async def test_resolve_space_url_returns_creator_info(self):
-        respx.get("https://api.bilibili.com/x/space/acc/info").mock(
+    async def test_resolve_space_url_returns_source_info(self):
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/acc/info").mock(
             return_value=Response(200, json=BILIBILI_USER_INFO_OK)
         )
 
-        creator = await crawler.resolve_creator("https://space.bilibili.com/123456")
+        source = await crawler.resolve_source("https://space.bilibili.com/123456")
 
-        assert creator.platform_id == "123456"
-        assert creator.name == "测试UP主"
-        assert creator.avatar_url == "https://example.com/avatar.jpg"
-        assert creator.profile_url == "https://space.bilibili.com/123456"
+        assert source.platform_id == "123456"
+        assert source.name == "测试UP主"
+        assert source.avatar_url == "https://example.com/avatar.jpg"
+        assert source.profile_url == "https://space.bilibili.com/123456"
 
     @respx.mock
     async def test_resolve_b23tv_follows_redirect(self):
@@ -86,27 +87,30 @@ class TestBilibiliResolveCreator:
         respx.get("https://space.bilibili.com/123456").mock(
             return_value=Response(200, json={}, headers={})
         )
-        respx.get("https://api.bilibili.com/x/space/acc/info").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/acc/info").mock(
             return_value=Response(200, json=BILIBILI_USER_INFO_OK)
         )
 
-        creator = await crawler.resolve_creator("https://b23.tv/abc123")
-        assert creator.platform_id == "123456"
+        source = await crawler.resolve_source("https://b23.tv/abc123")
+        assert source.platform_id == "123456"
 
     @respx.mock
     async def test_api_error_code_raises_value_error(self):
-        respx.get("https://api.bilibili.com/x/space/acc/info").mock(
+        _mock_wbi_prereqs()
+        respx.get("https://api.bilibili.com/x/space/wbi/acc/info").mock(
             return_value=Response(200, json={"code": -404, "data": None})
         )
 
         with pytest.raises(ValueError, match="Failed to resolve Bilibili creator"):
-            await crawler.resolve_creator("https://space.bilibili.com/999")
+            await crawler.resolve_source("https://space.bilibili.com/999")
 
     @respx.mock
     async def test_unsupported_url_raises_value_error(self):
+        _mock_wbi_prereqs()
         # URL that doesn't match space.bilibili.com, BV id, or mid param
         with pytest.raises(ValueError, match="Unsupported Bilibili creator URL"):
-            await crawler.resolve_creator("https://www.bilibili.com/")
+            await crawler.resolve_source("https://www.bilibili.com/")
 
 
 class TestBibiliFetchLatestVideos:

@@ -23,7 +23,9 @@ async def ensure_dev_account() -> None:
         return
 
     async with AsyncSessionLocal() as session:
-        existing_user = await session.scalar(select(User).where(User.email == settings.dev_account_email))
+        existing_user = await session.scalar(
+            select(User).where(User.email == settings.dev_account_email)
+        )
         if existing_user is not None:
             return
 

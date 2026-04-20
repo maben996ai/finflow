@@ -1,25 +1,33 @@
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.models.models import CrawlLog, CrawlLogStatus, Creator, FeishuWebhook, Platform, User, Video
+from app.models.models import (
+    CrawlLog,
+    CrawlLogStatus,
+    DataSource,
+    FeishuWebhook,
+    SourceType,
+    User,
+    Video,
+)
 from app.services.crawlers.base import CrawledVideo
-from app.services.scheduler import SchedulerService, crawl_all_creators, crawl_creator
+from app.services.scheduler import SchedulerService, crawl_all_sources, crawl_source
 
 
 def make_user() -> User:
     return User(email="test@example.com", password_hash="x", display_name="Tester")
 
 
-def make_creator(user_id: str, platform: Platform = Platform.BILIBILI) -> Creator:
-    return Creator(
+def make_source(user_id: str, source_type: SourceType = SourceType.BILIBILI) -> DataSource:
+    return DataSource(
         user_id=user_id,
-        platform=platform,
-        platform_creator_id="123456",
-        name="Test Creator",
+        source_type=source_type,
+        external_id="123456",
+        name="Test Source",
         profile_url="https://space.bilibili.com/123456",
     )
 
@@ -45,8 +53,9 @@ def session_factory(engine):
 class TestSchedulerService:
     async def test_start_is_idempotent(self):
         svc = SchedulerService()
-        with patch.object(svc.scheduler, "start") as mock_start, patch.object(
-            svc.scheduler, "add_job"
+        with (
+            patch.object(svc.scheduler, "start") as mock_start,
+            patch.object(svc.scheduler, "add_job"),
         ):
             await svc.start()
             await svc.start()
@@ -69,13 +78,13 @@ class TestSchedulerService:
         mock_shutdown.assert_not_called()
 
 
-class TestCrawlCreator:
+class TestCrawlSource:
     async def test_new_videos_are_inserted(self, db, session_factory):
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         mock_crawler = AsyncMock()
@@ -86,11 +95,11 @@ class TestCrawlCreator:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            inserted = await crawl_creator(creator)
+            inserted = await crawl_source(source)
 
         assert inserted == 1
         async with session_factory() as s:
-            videos = list(await s.scalars(select(Video).where(Video.creator_id == creator.id)))
+            videos = list(await s.scalars(select(Video).where(Video.data_source_id == source.id)))
         assert len(videos) == 1
         assert videos[0].platform_video_id == "BV001"
 
@@ -98,11 +107,11 @@ class TestCrawlCreator:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.flush()
         existing = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BV001",
             title="Existing",
             video_url="https://www.bilibili.com/video/BV001",
@@ -119,7 +128,7 @@ class TestCrawlCreator:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            inserted = await crawl_creator(creator)
+            inserted = await crawl_source(source)
 
         assert inserted == 0
 
@@ -127,8 +136,8 @@ class TestCrawlCreator:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         mock_crawler = AsyncMock()
@@ -139,10 +148,10 @@ class TestCrawlCreator:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
-            log = await s.scalar(select(CrawlLog).where(CrawlLog.creator_id == creator.id))
+            log = await s.scalar(select(CrawlLog).where(CrawlLog.data_source_id == source.id))
         assert log is not None
         assert log.status == CrawlLogStatus.SUCCESS
         assert log.videos_found == 1
@@ -151,8 +160,8 @@ class TestCrawlCreator:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         mock_crawler = AsyncMock()
@@ -163,25 +172,25 @@ class TestCrawlCreator:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            inserted = await crawl_creator(creator)
+            inserted = await crawl_source(source)
 
         assert inserted == 0
         async with session_factory() as s:
-            log = await s.scalar(select(CrawlLog).where(CrawlLog.creator_id == creator.id))
+            log = await s.scalar(select(CrawlLog).where(CrawlLog.data_source_id == source.id))
         assert log.videos_found == 0
 
 
-class TestCrawlCreatorDedup:
+class TestCrawlSourceDedup:
     async def test_existing_video_fields_are_not_overwritten(self, db, session_factory):
         """已入库视频不应被 crawler 返回的新字段覆盖。"""
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.flush()
         existing = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BV001",
             title="Original Title",
             thumbnail_url="https://cdn/old.jpg",
@@ -201,28 +210,26 @@ class TestCrawlCreatorDedup:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
-            row = await s.scalar(
-                select(Video).where(Video.platform_video_id == "BV001")
-            )
+            row = await s.scalar(select(Video).where(Video.platform_video_id == "BV001"))
         assert row.title == "Original Title"
         assert row.thumbnail_url == "https://cdn/old.jpg"
 
 
-class TestCrawlCreatorInitialization:
-    async def test_first_crawl_sets_creator_initialized_at(self, db, session_factory):
-        """首次抓取结束后，creator.initialized_at 从 None 变为有值。"""
+class TestCrawlSourceInitialization:
+    async def test_first_crawl_sets_source_initialized_at(self, db, session_factory):
+        """首次抓取结束后，source.initialized_at 从 None 变为有值。"""
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         async with session_factory() as s:
-            row = await s.get(Creator, creator.id)
+            row = await s.get(DataSource, source.id)
         assert row.initialized_at is None
 
         mock_crawler = AsyncMock()
@@ -234,10 +241,10 @@ class TestCrawlCreatorInitialization:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
-            refreshed = await s.get(Creator, creator.id)
+            refreshed = await s.get(DataSource, source.id)
         assert refreshed.initialized_at is not None
 
     async def test_first_crawl_sets_initialized_at_even_when_no_videos(self, db, session_factory):
@@ -245,8 +252,8 @@ class TestCrawlCreatorInitialization:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         mock_crawler = AsyncMock()
@@ -257,10 +264,10 @@ class TestCrawlCreatorInitialization:
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
-            refreshed = await s.get(Creator, creator.id)
+            refreshed = await s.get(DataSource, source.id)
         assert refreshed.initialized_at is not None
 
     async def test_subsequent_crawl_preserves_initialized_at(self, db, session_factory):
@@ -269,12 +276,12 @@ class TestCrawlCreatorInitialization:
         db.add(user)
         await db.flush()
         initialized = datetime(2024, 1, 1, 10, 0, 0, tzinfo=UTC)
-        creator = make_creator(user.id)
-        creator.initialized_at = initialized
-        db.add(creator)
+        source = make_source(user.id)
+        source.initialized_at = initialized
+        db.add(source)
         await db.flush()
         existing = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BV001",
             title="Existing",
             video_url="https://www.bilibili.com/video/BV001",
@@ -293,22 +300,22 @@ class TestCrawlCreatorInitialization:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
-            refreshed = await s.get(Creator, creator.id)
+            refreshed = await s.get(DataSource, source.id)
         assert refreshed.initialized_at is not None
         assert refreshed.initialized_at.replace(tzinfo=UTC) == initialized
 
 
-class TestCrawlCreatorNotifications:
+class TestCrawlSourceNotifications:
     async def test_first_crawl_only_sends_latest_video_once(self, db, session_factory):
         """首次抓取多条内容时，只发送最新 1 条通知。"""
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         db.add(
             FeishuWebhook(
                 user_id=user.id,
@@ -334,7 +341,7 @@ class TestCrawlCreatorNotifications:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         mock_send.assert_awaited_once()
         _, kwargs = mock_send.await_args
@@ -347,8 +354,8 @@ class TestCrawlCreatorNotifications:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
         base = datetime(2024, 6, 1, tzinfo=UTC)
@@ -366,16 +373,17 @@ class TestCrawlCreatorNotifications:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
             rows = list(
                 await s.scalars(
-                    select(Video).where(Video.creator_id == creator.id).order_by(Video.published_at.desc())
+                    select(Video)
+                    .where(Video.data_source_id == source.id)
+                    .order_by(Video.published_at.desc())
                 )
             )
         assert len(rows) == 3
-        # 最新一条 notified_at 为 None（或已被通知成功写入），另外两条被预标为已通知
         assert rows[1].notified_at is not None
         assert rows[2].notified_at is not None
 
@@ -384,8 +392,8 @@ class TestCrawlCreatorNotifications:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         db.add(
             FeishuWebhook(
                 user_id=user.id,
@@ -405,7 +413,7 @@ class TestCrawlCreatorNotifications:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         mock_send.assert_awaited()
         async with session_factory() as s:
@@ -417,8 +425,8 @@ class TestCrawlCreatorNotifications:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         db.add(
             FeishuWebhook(
                 user_id=user.id,
@@ -441,7 +449,7 @@ class TestCrawlCreatorNotifications:
             ),
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         async with session_factory() as s:
             row = await s.scalar(select(Video).where(Video.platform_video_id == "BV001"))
@@ -452,8 +460,8 @@ class TestCrawlCreatorNotifications:
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.flush()
         db.add(
             FeishuWebhook(
@@ -463,9 +471,8 @@ class TestCrawlCreatorNotifications:
                 enabled=True,
             )
         )
-        # 已入库且通知失败过
         existing = Video(
-            creator_id=creator.id,
+            data_source_id=source.id,
             platform_video_id="BV001",
             title="pending",
             video_url="https://www.bilibili.com/video/BV001",
@@ -476,7 +483,9 @@ class TestCrawlCreatorNotifications:
         await db.commit()
 
         mock_crawler = AsyncMock()
-        mock_crawler.fetch_latest_videos = AsyncMock(return_value=[make_video("BV001", title="pending")])
+        mock_crawler.fetch_latest_videos = AsyncMock(
+            return_value=[make_video("BV001", title="pending")]
+        )
 
         with (
             patch("app.services.scheduler.crawler_registry") as mock_registry,
@@ -484,7 +493,7 @@ class TestCrawlCreatorNotifications:
             patch("app.services.scheduler._notifier.send_card", new=AsyncMock()) as mock_send,
         ):
             mock_registry.get.return_value = mock_crawler
-            await crawl_creator(creator)
+            await crawl_source(source)
 
         mock_send.assert_awaited()
         async with session_factory() as s:
@@ -492,25 +501,25 @@ class TestCrawlCreatorNotifications:
         assert row.notified_at is not None
 
 
-class TestCrawlAllCreators:
+class TestCrawlAllSources:
     async def test_failed_crawl_writes_failed_log(self, db, session_factory):
         user = make_user()
         db.add(user)
         await db.flush()
-        creator = make_creator(user.id)
-        db.add(creator)
+        source = make_source(user.id)
+        db.add(source)
         await db.commit()
 
-        async def _fake_crawl_creator(c):
+        async def _fake_crawl_source(s):
             raise RuntimeError("API timeout")
 
         with (
             patch("app.services.scheduler.AsyncSessionLocal", session_factory),
-            patch("app.services.scheduler.crawl_creator", side_effect=_fake_crawl_creator),
+            patch("app.services.scheduler.crawl_source", side_effect=_fake_crawl_source),
         ):
-            await crawl_all_creators()
+            await crawl_all_sources()
 
         async with session_factory() as s:
-            log = await s.scalar(select(CrawlLog).where(CrawlLog.creator_id == creator.id))
+            log = await s.scalar(select(CrawlLog).where(CrawlLog.data_source_id == source.id))
         assert log.status == CrawlLogStatus.FAILED
         assert "API timeout" in log.message

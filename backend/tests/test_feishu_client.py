@@ -1,4 +1,5 @@
 """FeishuAppClient 单元测试：token 获取与缓存、图片上传、错误路径。"""
+
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -18,7 +19,12 @@ def _make_async_client_mock(responses: list):
     return mock_client
 
 
-def _response(status: int = 200, json_data: dict | None = None, content: bytes = b"", headers: dict | None = None):
+def _response(
+    status: int = 200,
+    json_data: dict | None = None,
+    content: bytes = b"",
+    headers: dict | None = None,
+):
     r = MagicMock(spec=httpx.Response)
     r.status_code = status
     r.json = MagicMock(return_value=json_data or {})
@@ -54,9 +60,7 @@ class TestTenantAccessToken:
             json_data={"code": 0, "tenant_access_token": "t-abc", "expire": 7200}
         )
 
-        with patch(
-            "app.services.notifiers.feishu_client.httpx.AsyncClient"
-        ) as mock_cls:
+        with patch("app.services.notifiers.feishu_client.httpx.AsyncClient") as mock_cls:
             mock_cls.return_value = _make_async_client_mock([token_resp])
             token = await client.get_tenant_access_token()
 
@@ -68,9 +72,7 @@ class TestTenantAccessToken:
             json_data={"code": 0, "tenant_access_token": "t-cached", "expire": 7200}
         )
 
-        with patch(
-            "app.services.notifiers.feishu_client.httpx.AsyncClient"
-        ) as mock_cls:
+        with patch("app.services.notifiers.feishu_client.httpx.AsyncClient") as mock_cls:
             first = _make_async_client_mock([token_resp])
             mock_cls.return_value = first
             t1 = await client.get_tenant_access_token()
@@ -84,16 +86,10 @@ class TestTenantAccessToken:
     async def test_refetches_when_token_expired(self):
         client = FeishuAppClient(app_id="cli_x", app_secret="sec")
         # First response sets expire very small so safety window makes it already expired
-        resp1 = _response(
-            json_data={"code": 0, "tenant_access_token": "t-old", "expire": 10}
-        )
-        resp2 = _response(
-            json_data={"code": 0, "tenant_access_token": "t-new", "expire": 7200}
-        )
+        resp1 = _response(json_data={"code": 0, "tenant_access_token": "t-old", "expire": 10})
+        resp2 = _response(json_data={"code": 0, "tenant_access_token": "t-new", "expire": 7200})
 
-        with patch(
-            "app.services.notifiers.feishu_client.httpx.AsyncClient"
-        ) as mock_cls:
+        with patch("app.services.notifiers.feishu_client.httpx.AsyncClient") as mock_cls:
             # Each async with creates a new client instance
             mock_cls.side_effect = [
                 _make_async_client_mock([resp1]),
@@ -111,9 +107,7 @@ class TestTenantAccessToken:
         client = FeishuAppClient(app_id="cli_x", app_secret="sec")
         err_resp = _response(json_data={"code": 99991663, "msg": "app_id invalid"})
 
-        with patch(
-            "app.services.notifiers.feishu_client.httpx.AsyncClient"
-        ) as mock_cls:
+        with patch("app.services.notifiers.feishu_client.httpx.AsyncClient") as mock_cls:
             mock_cls.return_value = _make_async_client_mock([err_resp])
             with pytest.raises(RuntimeError) as ei:
                 await client.get_tenant_access_token()

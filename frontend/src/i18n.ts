@@ -16,7 +16,7 @@ const messages = {
       product: "TrendRadar",
       title: "信号台",
       feed: "动态资讯",
-      creators: "信源管理",
+      dataSources: "信源管理",
       settings: "设置",
       crawlLogs: "抓取日志",
       controlCenter: "控制中心",
@@ -29,7 +29,7 @@ const messages = {
       sortByTime: "按时间",
       sortByAuthor: "按作者",
       loading: "加载中…",
-      empty: "暂无视频，先去添加创作者并触发抓取吧。",
+      empty: "暂无视频，先去添加信源并触发抓取吧。",
       fetchError: "加载失败，请稍后重试。",
       prevPage: "上一页",
       nextPage: "下一页",
@@ -41,23 +41,28 @@ const messages = {
       comingSoon: "即将上线，敬请期待",
       backToFeed: "← 返回动态",
     },
-    creators: {
-      eyebrow: "创作者",
-      title: "创作者管理",
+    dataSources: {
+      eyebrow: "信源",
+      title: "信源管理",
       addPlaceholder: "粘贴 Bilibili 或 YouTube 主页链接",
       addButton: "添加",
       adding: "添加中…",
-      empty: "还没有订阅的创作者，粘贴主页链接开始添加。",
+      empty: "还没有订阅的信源，粘贴主页链接开始添加。",
       loading: "加载中…",
       fetchError: "加载失败，请稍后重试。",
       addError: "添加失败，请检查链接格式或网络。",
       initializing: "初始化中…",
-      deleteConfirm: "确认删除该创作者？",
+      deleteConfirm: "确认删除该信源？",
       notePlaceholder: "备注（可选）",
       categoryPlaceholder: "分类（可选）",
+      contentTypeLabel: "内容类型",
+      editTitle: "编辑信源",
       save: "保存",
       cancel: "取消",
       starred: "特别关注",
+      unstar: "取消特别关注",
+      edit: "编辑",
+      delete: "删除",
       tabVideos: "视频",
       tabArticles: "文章",
       tabNews: "资讯",
@@ -65,6 +70,8 @@ const messages = {
       comingSoon: "该板块即将上线",
       platformBilibili: "Bilibili",
       platformYoutube: "YouTube",
+      platformWechat: "公众号",
+      platformWebsite: "网站",
     },
     settings: {
       eyebrow: "设置",
@@ -115,7 +122,7 @@ const messages = {
       product: "TrendRadar",
       title: "Signal Desk",
       feed: "Latest Updates",
-      creators: "Sources",
+      dataSources: "Sources",
       settings: "Settings",
       crawlLogs: "Crawl Logs",
       controlCenter: "Control Center",
@@ -128,7 +135,7 @@ const messages = {
       sortByTime: "By Time",
       sortByAuthor: "By Author",
       loading: "Loading…",
-      empty: "No videos yet. Add a creator and trigger a crawl first.",
+      empty: "No videos yet. Add a source and trigger a crawl first.",
       fetchError: "Failed to load. Please try again.",
       prevPage: "Prev",
       nextPage: "Next",
@@ -140,23 +147,28 @@ const messages = {
       comingSoon: "Coming soon",
       backToFeed: "← Back to Feed",
     },
-    creators: {
-      eyebrow: "Creators",
-      title: "Creators",
+    dataSources: {
+      eyebrow: "Sources",
+      title: "Source Management",
       addPlaceholder: "Paste a Bilibili or YouTube channel URL",
       addButton: "Add",
       adding: "Adding…",
-      empty: "No creators yet. Paste a channel URL to get started.",
+      empty: "No sources yet. Paste a channel URL to get started.",
       loading: "Loading…",
       fetchError: "Failed to load. Please try again.",
       addError: "Failed to add. Check the URL format or your connection.",
       initializing: "Initializing…",
-      deleteConfirm: "Delete this creator?",
+      deleteConfirm: "Delete this source?",
       notePlaceholder: "Note (optional)",
       categoryPlaceholder: "Category (optional)",
+      contentTypeLabel: "Content type",
+      editTitle: "Edit source",
       save: "Save",
       cancel: "Cancel",
-      starred: "Starred",
+      starred: "Star",
+      unstar: "Unstar",
+      edit: "Edit",
+      delete: "Delete",
       tabVideos: "Videos",
       tabArticles: "Articles",
       tabNews: "News",
@@ -164,6 +176,8 @@ const messages = {
       comingSoon: "This section is coming soon",
       platformBilibili: "Bilibili",
       platformYoutube: "YouTube",
+      platformWechat: "WeChat",
+      platformWebsite: "Website",
     },
     settings: {
       eyebrow: "Settings",
@@ -214,7 +228,7 @@ type MessageKey =
   | "nav.product"
   | "nav.title"
   | "nav.feed"
-  | "nav.creators"
+  | "nav.dataSources"
   | "nav.settings"
   | "nav.crawlLogs"
   | "nav.controlCenter"
@@ -236,29 +250,36 @@ type MessageKey =
   | "feed.viewAll"
   | "feed.comingSoon"
   | "feed.backToFeed"
-  | "creators.eyebrow"
-  | "creators.title"
-  | "creators.addPlaceholder"
-  | "creators.addButton"
-  | "creators.adding"
-  | "creators.empty"
-  | "creators.loading"
-  | "creators.fetchError"
-  | "creators.addError"
-  | "creators.initializing"
-  | "creators.deleteConfirm"
-  | "creators.notePlaceholder"
-  | "creators.categoryPlaceholder"
-  | "creators.save"
-  | "creators.cancel"
-  | "creators.starred"
-  | "creators.tabVideos"
-  | "creators.tabArticles"
-  | "creators.tabNews"
-  | "creators.tabMarket"
-  | "creators.comingSoon"
-  | "creators.platformBilibili"
-  | "creators.platformYoutube"
+  | "dataSources.eyebrow"
+  | "dataSources.title"
+  | "dataSources.addPlaceholder"
+  | "dataSources.addButton"
+  | "dataSources.adding"
+  | "dataSources.empty"
+  | "dataSources.loading"
+  | "dataSources.fetchError"
+  | "dataSources.addError"
+  | "dataSources.initializing"
+  | "dataSources.deleteConfirm"
+  | "dataSources.notePlaceholder"
+  | "dataSources.categoryPlaceholder"
+  | "dataSources.contentTypeLabel"
+  | "dataSources.editTitle"
+  | "dataSources.save"
+  | "dataSources.cancel"
+  | "dataSources.starred"
+  | "dataSources.unstar"
+  | "dataSources.edit"
+  | "dataSources.delete"
+  | "dataSources.tabVideos"
+  | "dataSources.tabArticles"
+  | "dataSources.tabNews"
+  | "dataSources.tabMarket"
+  | "dataSources.comingSoon"
+  | "dataSources.platformBilibili"
+  | "dataSources.platformYoutube"
+  | "dataSources.platformWechat"
+  | "dataSources.platformWebsite"
   | "settings.eyebrow"
   | "settings.title"
   | "settings.description"

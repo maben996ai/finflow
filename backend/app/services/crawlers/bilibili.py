@@ -8,10 +8,10 @@ from urllib.parse import ParseResult, parse_qs, urlparse
 import httpx
 
 from app.core.config import get_settings
+from app.models.models import SourceType
+from app.services.crawlers.base import BaseCrawler, CrawledVideo, SourceInfo
 
 settings = get_settings()
-from app.models.models import Platform
-from app.services.crawlers.base import BaseCrawler, CrawledVideo, CreatorInfo
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -20,10 +20,70 @@ USER_AGENT = (
 
 # https://github.com/SocialSisterYi/bilibili-API-collect/blob/master/docs/misc/sign/wbi.md
 _MIXIN_KEY_ENC_TAB = [
-    46, 47, 18,  2, 53,  8, 23, 32, 15, 50, 10, 31, 58,  3, 45, 35,
-    27, 43,  5, 49, 33,  9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13,
-    37, 48,  7, 16, 24, 55, 40, 61, 26, 17,  0,  1, 60, 51, 30,  4,
-    22, 25, 54, 21, 56, 59,  6, 63, 57, 62, 11, 36, 20, 34, 44, 52,
+    46,
+    47,
+    18,
+    2,
+    53,
+    8,
+    23,
+    32,
+    15,
+    50,
+    10,
+    31,
+    58,
+    3,
+    45,
+    35,
+    27,
+    43,
+    5,
+    49,
+    33,
+    9,
+    42,
+    19,
+    29,
+    28,
+    14,
+    39,
+    12,
+    38,
+    41,
+    13,
+    37,
+    48,
+    7,
+    16,
+    24,
+    55,
+    40,
+    61,
+    26,
+    17,
+    0,
+    1,
+    60,
+    51,
+    30,
+    4,
+    22,
+    25,
+    54,
+    21,
+    56,
+    59,
+    6,
+    63,
+    57,
+    62,
+    11,
+    36,
+    20,
+    34,
+    44,
+    52,
 ]
 
 
@@ -41,12 +101,14 @@ def _wbi_sign(params: dict, mixin_key: str) -> dict:
 
 
 class BilibiliCrawler(BaseCrawler):
-    platform = Platform.BILIBILI
+    source_type = SourceType.BILIBILI
 
-    async def resolve_creator(self, url: str) -> CreatorInfo:
+    async def resolve_source(self, url: str) -> SourceInfo:
         sessdata = settings.bilibili_sessdata
         cookies = {"SESSDATA": sessdata} if sessdata else {}
-        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, cookies=cookies, timeout=15) as client:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": USER_AGENT}, cookies=cookies, timeout=15
+        ) as client:
             spi = await client.get("https://api.bilibili.com/x/frontend/finger/spi")
             spi_data = spi.json().get("data", {})
             client.cookies.set("buvid3", spi_data.get("b_3", ""))
@@ -64,7 +126,9 @@ class BilibiliCrawler(BaseCrawler):
                 raise ValueError("Unsupported Bilibili creator URL")
 
             params = _wbi_sign({"mid": uid}, mixin_key)
-            response = await client.get("https://api.bilibili.com/x/space/wbi/acc/info", params=params)
+            response = await client.get(
+                "https://api.bilibili.com/x/space/wbi/acc/info", params=params
+            )
             response.raise_for_status()
             payload = response.json()
 
@@ -72,7 +136,7 @@ class BilibiliCrawler(BaseCrawler):
         if payload.get("code") not in (0, None) or not data:
             raise ValueError("Failed to resolve Bilibili creator")
 
-        return CreatorInfo(
+        return SourceInfo(
             platform_id=str(data["mid"]),
             name=data.get("name") or f"Bilibili {uid}",
             profile_url=f"https://space.bilibili.com/{data['mid']}",
@@ -80,13 +144,15 @@ class BilibiliCrawler(BaseCrawler):
             raw_data=data,
         )
 
-    async def fetch_latest_videos(self, creator_id: str, limit: int = 20) -> list[CrawledVideo]:
+    async def fetch_latest_videos(self, external_id: str, limit: int = 20) -> list[CrawledVideo]:
         sessdata = settings.bilibili_sessdata
         if not sessdata:
             return []
 
         cookies = {"SESSDATA": sessdata}
-        async with httpx.AsyncClient(headers={"User-Agent": USER_AGENT}, cookies=cookies, timeout=20) as client:
+        async with httpx.AsyncClient(
+            headers={"User-Agent": USER_AGENT}, cookies=cookies, timeout=20
+        ) as client:
             # Step 1: get buvid3/buvid4 for anti-bot
             spi = await client.get("https://api.bilibili.com/x/frontend/finger/spi")
             spi_data = spi.json().get("data", {})
@@ -102,10 +168,12 @@ class BilibiliCrawler(BaseCrawler):
 
             # Step 3: signed request to new endpoint
             params = _wbi_sign(
-                {"mid": creator_id, "pn": 1, "ps": limit, "order": "pubdate"},
+                {"mid": external_id, "pn": 1, "ps": limit, "order": "pubdate"},
                 mixin_key,
             )
-            response = await client.get("https://api.bilibili.com/x/space/wbi/arc/search", params=params)
+            response = await client.get(
+                "https://api.bilibili.com/x/space/wbi/arc/search", params=params
+            )
             response.raise_for_status()
             payload = response.json()
 

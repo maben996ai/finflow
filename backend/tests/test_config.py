@@ -1,6 +1,3 @@
-import os
-import tempfile
-
 from app.core.config import Settings, get_settings
 
 

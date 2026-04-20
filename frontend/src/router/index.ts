@@ -2,13 +2,13 @@ import { createRouter, createWebHistory } from "vue-router";
 
 import AppShell from "../components/layout/AppShell.vue";
 import { useAuthStore } from "../stores/auth";
-import AuthorFeedView from "../views/AuthorFeedView.vue";
 import ContentAnalysisView from "../views/ContentAnalysisView.vue";
 import ControlCenterView from "../views/ControlCenterView.vue";
-import CreatorsView from "../views/CreatorsView.vue";
+import DataSourcesView from "../views/DataSourcesView.vue";
 import FeedView from "../views/FeedView.vue";
 import LoginView from "../views/LoginView.vue";
 import RegisterView from "../views/RegisterView.vue";
+import SourceFeedView from "../views/SourceFeedView.vue";
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -20,8 +20,10 @@ export const router = createRouter({
       component: AppShell,
       children: [
         { path: "", name: "feed", component: FeedView },
-        { path: "author/:creatorId", name: "author-feed", component: AuthorFeedView },
-        { path: "creators", name: "creators", component: CreatorsView },
+        { path: "source/:sourceId", name: "source-feed", component: SourceFeedView },
+        { path: "sources", name: "data-sources", component: DataSourcesView },
+        { path: "creators", redirect: "/sources" },
+        { path: "author/:creatorId", redirect: (to) => `/source/${to.params.creatorId}` },
         { path: "content-analysis", name: "content-analysis", component: ContentAnalysisView },
         { path: "control-center", name: "control-center", component: ControlCenterView },
       ],

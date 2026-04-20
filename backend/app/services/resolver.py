@@ -1,29 +1,28 @@
 import re
 
-from app.models.models import Platform
-from app.services.crawlers.base import CreatorInfo
+from app.models.models import SourceType
+from app.services.crawlers.base import SourceInfo
 from app.services.crawlers.registry import crawler_registry
 
-PLATFORM_PATTERNS: dict[Platform, tuple[str, ...]] = {
-    Platform.BILIBILI: (
+SOURCE_PATTERNS: dict[SourceType, tuple[str, ...]] = {
+    SourceType.BILIBILI: (
         r"https?://space\.bilibili\.com/\d+",
         r"https?://(?:www\.)?bilibili\.com/video/BV[\w]+",
         r"https?://b23\.tv/[\w]+",
     ),
-    Platform.YOUTUBE: (
+    SourceType.YOUTUBE: (
         r"https?://(?:www\.)?youtube\.com/channel/[\w-]+",
         r"https?://(?:www\.)?youtube\.com/@[\w.-]+",
     ),
 }
 
 
-async def resolve_creator(url: str) -> tuple[Platform, CreatorInfo]:
+async def resolve_source(url: str) -> tuple[SourceType, SourceInfo]:
     normalized_url = url.strip()
-    for platform, patterns in PLATFORM_PATTERNS.items():
+    for source_type, patterns in SOURCE_PATTERNS.items():
         if any(re.search(pattern, normalized_url, flags=re.IGNORECASE) for pattern in patterns):
-            crawler = crawler_registry.get(platform)
-            creator = await crawler.resolve_creator(normalized_url)
-            return platform, creator
+            crawler = crawler_registry.get(source_type)
+            source = await crawler.resolve_source(normalized_url)
+            return source_type, source
 
-    raise ValueError("Unsupported creator URL")
-
+    raise ValueError("Unsupported source URL")

@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.models import ContentType, CrawlLogStatus, Platform
+from app.models.models import ContentType, CrawlLogStatus, SourceType
 
 
 class UserCreate(BaseModel):
@@ -30,31 +30,34 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
-class CreatorCreate(BaseModel):
+class DataSourceCreate(BaseModel):
     url: str
     note: str | None = None
     content_type: ContentType = ContentType.VIDEO
+    source_config: dict | None = None
 
 
-class CreatorUpdate(BaseModel):
+class DataSourceUpdate(BaseModel):
     note: str | None = None
     category: str | None = None
     starred: bool | None = None
     content_type: ContentType | None = None
+    source_config: dict | None = None
 
 
-class CreatorResponse(BaseModel):
+class DataSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    platform: Platform
-    platform_creator_id: str
+    source_type: SourceType
+    external_id: str
     name: str
     profile_url: str
     avatar_url: str | None
     note: str | None
     category: str | None
     content_type: ContentType
+    source_config: dict | None
     starred: bool
     notifications_enabled: bool
     initialized_at: datetime | None = None
@@ -65,7 +68,7 @@ class VideoResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    creator_id: str
+    data_source_id: str
     platform_video_id: str
     title: str
     thumbnail_url: str | None
@@ -73,9 +76,9 @@ class VideoResponse(BaseModel):
     published_at: datetime
     duration_seconds: int | None = None
     notified_at: datetime | None = None
-    creator_name: str
-    creator_avatar_url: str | None
-    platform: Platform
+    data_source_name: str
+    data_source_avatar_url: str | None
+    source_type: SourceType
 
 
 class SettingsUpdate(BaseModel):
@@ -128,7 +131,7 @@ class CrawlLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    creator_id: str
+    data_source_id: str
     status: CrawlLogStatus
     message: str | None
     videos_found: int

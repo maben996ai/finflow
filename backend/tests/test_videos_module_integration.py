@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.videos import list_videos
-from app.models.models import Creator, Platform, User, Video
+from app.models.models import DataSource, SourceType, User, Video
 
 
 async def _seed_user(db) -> User:
@@ -18,25 +18,25 @@ async def _seed_user(db) -> User:
     return user
 
 
-async def _seed_creator(db, user_id: str) -> Creator:
-    creator = Creator(
+async def _seed_data_source(db, user_id: str) -> DataSource:
+    source = DataSource(
         user_id=user_id,
-        platform=Platform.BILIBILI,
-        platform_creator_id="integration_uid",
+        source_type=SourceType.BILIBILI,
+        external_id="integration_uid",
         name="Integration Creator",
         profile_url="https://space.bilibili.com/integration_uid",
     )
-    db.add(creator)
+    db.add(source)
     await db.flush()
-    return creator
+    return source
 
 
-async def _seed_videos(db, creator: Creator, count: int) -> None:
+async def _seed_videos(db, source: DataSource, count: int) -> None:
     base = datetime(2024, 1, 1, tzinfo=UTC)
     for index in range(count):
         db.add(
             Video(
-                creator_id=creator.id,
+                data_source_id=source.id,
                 platform_video_id=f"BV{index}",
                 title=f"Video {index}",
                 video_url=f"https://www.bilibili.com/video/BV{index}",
@@ -49,12 +49,14 @@ async def _seed_videos(db, creator: Creator, count: int) -> None:
 class TestVideosModuleIntegration:
     async def test_list_videos_paginates_with_cursor_directly(self, db):
         user = await _seed_user(db)
-        creator = await _seed_creator(db, user.id)
-        await _seed_videos(db, creator, 6)
+        source = await _seed_data_source(db, user.id)
+        await _seed_videos(db, source, 6)
 
-        first_page = await list_videos(platform=None, cursor=None, limit=3, current_user=user, db=db)
+        first_page = await list_videos(
+            source_type=None, cursor=None, limit=3, current_user=user, db=db
+        )
         second_page = await list_videos(
-            platform=None,
+            source_type=None,
             cursor=first_page.next_cursor,
             limit=3,
             current_user=user,
@@ -73,7 +75,7 @@ class TestVideosModuleIntegration:
         user = await _seed_user(db)
 
         with pytest.raises(HTTPException) as exc_info:
-            await list_videos(platform=None, cursor="invalid", limit=3, current_user=user, db=db)
+            await list_videos(source_type=None, cursor="invalid", limit=3, current_user=user, db=db)
 
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail == "Invalid cursor"

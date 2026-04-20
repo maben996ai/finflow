@@ -14,7 +14,9 @@ _notifier = FeishuNotifier()
 
 async def _get_webhook_or_404(db: AsyncSession, webhook_id: str, user_id: str) -> FeishuWebhook:
     row = await db.scalar(
-        select(FeishuWebhook).where(FeishuWebhook.id == webhook_id, FeishuWebhook.user_id == user_id)
+        select(FeishuWebhook).where(
+            FeishuWebhook.id == webhook_id, FeishuWebhook.user_id == user_id
+        )
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Webhook not found")

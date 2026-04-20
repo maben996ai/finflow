@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.core.database import get_db
-from app.models.models import Platform, User, Video
+from app.models.models import SourceType, User, Video
 from app.schemas.schemas import VideoListResponse, VideoResponse
 
 router = APIRouter()
@@ -82,7 +82,7 @@ def _decode_cursor(cursor: str) -> tuple[str, str]:
 
 @router.get("", response_model=VideoListResponse)
 async def list_videos(
-    platform: Platform | None = Query(default=None),
+    source_type: SourceType | None = Query(default=None),
     cursor: str | None = Query(default=None),
     limit: int = Query(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT),
     current_user: User = Depends(get_current_user),
@@ -90,14 +90,14 @@ async def list_videos(
 ) -> VideoListResponse:
     stmt = (
         select(Video)
-        .options(selectinload(Video.creator))
-        .join(Video.creator)
-        .where(Video.creator.has(user_id=current_user.id))
+        .options(selectinload(Video.data_source))
+        .join(Video.data_source)
+        .where(Video.data_source.has(user_id=current_user.id))
         .order_by(Video.published_at.desc(), Video.id.desc())
         .limit(limit + 1)
     )
-    if platform is not None:
-        stmt = stmt.where(Video.creator.has(platform=platform))
+    if source_type is not None:
+        stmt = stmt.where(Video.data_source.has(source_type=source_type))
     if cursor is not None:
         try:
             cursor_published_at, cursor_id = _decode_cursor(cursor)
@@ -125,16 +125,16 @@ async def list_videos(
     items = [
         VideoResponse(
             id=v.id,
-            creator_id=v.creator_id,
+            data_source_id=v.data_source_id,
             platform_video_id=v.platform_video_id,
             title=v.title,
             thumbnail_url=v.thumbnail_url,
             video_url=v.video_url,
             published_at=v.published_at,
             duration_seconds=_extract_duration_seconds(v.raw_data),
-            creator_name=v.creator.name,
-            creator_avatar_url=v.creator.avatar_url,
-            platform=v.creator.platform,
+            data_source_name=v.data_source.name,
+            data_source_avatar_url=v.data_source.avatar_url,
+            source_type=v.data_source.source_type,
         )
         for v in page
     ]

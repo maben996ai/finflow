@@ -52,7 +52,9 @@ class FeishuNotifier(BaseNotifier):
         if not webhook_url:
             return
 
-        header_title = f"🆕 新增信源：{creator_name}" if is_new_creator else f"📹 新视频：{creator_name}"
+        header_title = (
+            f"🆕 新增信源：{creator_name}" if is_new_creator else f"📹 新视频：{creator_name}"
+        )
         platform_label = "Bilibili" if platform == "bilibili" else "YouTube"
 
         image_key = await self._resolve_image_key(thumbnail_url)
@@ -63,14 +65,23 @@ class FeishuNotifier(BaseNotifier):
             title_md += f"\n\n🖼 [封面预览]({thumbnail_url})"
 
         fields = [
-            {"is_short": True, "text": {"tag": "lark_md", "content": f"**平台**\n{platform_label}"}},
-            {"is_short": True, "text": {"tag": "lark_md", "content": f"**创作者**\n{creator_name}"}},
+            {
+                "is_short": True,
+                "text": {"tag": "lark_md", "content": f"**平台**\n{platform_label}"},
+            },
+            {
+                "is_short": True,
+                "text": {"tag": "lark_md", "content": f"**创作者**\n{creator_name}"},
+            },
         ]
         if published_at is not None:
             fields.append(
                 {
                     "is_short": False,
-                    "text": {"tag": "lark_md", "content": f"**发布时间**\n{_format_published_at(published_at)}"},
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**发布时间**\n{_format_published_at(published_at)}",
+                    },
                 }
             )
 
